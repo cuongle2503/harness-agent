@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  agent-server:
+    build: .
+    ports:
+      - "2024:2024"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - AGENT_ENV=production
+      - LOG_LEVEL=INFO
+    volumes:
+      - agent-memory:/memories
+      - agent-policies:/policies
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2024/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "4G"
+        reservations:
+          cpus: "1"
+          memory: "2G"
+
+volumes:
+  agent-memory:
+  agent-policies:
