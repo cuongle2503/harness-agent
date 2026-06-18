@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp", "--api-key", "ctx7sk-fe1f1c5e-2cdc-4d93-ae78-d1ed9bee0bba"],
+      "env": {
+        "HTTP_PROXY": "http://10.100.101.6:8080",
+        "HTTPS_PROXY": "http://10.100.101.6:8080",
+        "NO_PROXY": "localhost,127.0.0.1,::1"
+      }
+    }
+  }
+}

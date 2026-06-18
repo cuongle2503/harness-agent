@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(uv sync)",
+      "Bash(uv pip install *)",
+      "Bash(pytest *)",
+      "Bash(ruff check *)",
+      "Bash(mypy *)",
+      "Bash(black *)",
+      "Bash(isort *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '⚠️  Guard: verify this bash command is safe before running'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if ls src/**/*.py 2>/dev/null; then ruff check src/ --output-format concise 2>/dev/null || true; fi",
+            "async": true,
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f pyproject.toml ] && [ -d tests ]; then python -m pytest tests/ -x -q 2>/dev/null || echo '⚠️  Tests failed or not runnable yet'; fi",
+            "async": true,
+            "timeout": 120
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if ls src/**/*.py 2>/dev/null; then ruff check src/ --output-format concise 2>/dev/null && echo '✅ Lint clean' || echo '⚠️  Lint issues found'; fi",
+            "async": true,
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '🐍 Python: '\"$(python3 --version 2>&1)\"'; uv: '\"$(uv --version 2>&1 || echo 'not installed')\""
+          }
+        ]
+      }
+    ]
+  }
+}
