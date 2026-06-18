@@ -1,12 +1,13 @@
 # Phase 0: Foundation Plan
 
 > **Mục tiêu**: Chuẩn bị môi trường phát triển, chọn model, kiểm kê tools — nền tảng vững chắc trước khi bắt đầu xây dựng agent.
+> **Trạng thái**: ✅ Hoàn thành (commit `d06a533`)
 
 ## Prerequisites
 
-- [ ] Đã đọc [AIDLC Lifecycle](../aidlc-lifecycle.md)
-- [ ] Đã đọc [Deep Agents README](../../deep-agents/README.md)
-- [ ] Đã hiểu tổng quan 9 giai đoạn AIDLC
+- [x] Đã đọc [AIDLC Lifecycle](../aidlc-lifecycle.md)
+- [x] Đã đọc [Deep Agents README](../../deep-agents/README.md)
+- [x] Đã hiểu tổng quan 9 giai đoạn AIDLC
 
 ---
 
@@ -35,14 +36,15 @@ uv pip install pytest pytest-asyncio pytest-cov ruff mypy
 - **Rule**: `.claude/rules/python/coding-style.md` — PEP 8, type hints
 
 **Checklist**:
-- [ ] Python 3.11+ installed
-- [ ] `uv` package manager available
-- [ ] `deepagents` installed
-- [ ] `langchain` + `langgraph` installed
-- [ ] `langchain-deepseek` installed
-- [ ] `deepagents-code` installed (optional, cho CLI/Server)
-- [ ] Dev tools: `pytest`, `ruff`, `mypy` installed
-- [ ] `uv sync` clean (không lỗi)
+- [x] Python 3.11+ installed (3.12.13 in venv)
+- [x] `uv` package manager available (0.10.6)
+- [x] `deepagents` installed (0.6.10)
+- [x] `langchain` + `langgraph` installed (1.3.9 / 1.2.5)
+- [x] `langchain-deepseek` installed (1.1.0)
+- [x] `deepagents-code` installed (0.1.20)
+- [x] Dev tools: `pytest` (9.1.0), `ruff` (0.15.17), `mypy` (2.1.0) installed
+- [x] `pyproject.toml` configured with all deps, ruff, mypy, pytest settings
+- [x] `uv sync` clean (không lỗi)
 
 ---
 
@@ -65,12 +67,12 @@ uv pip install pytest pytest-asyncio pytest-cov ruff mypy
 - **DeepSeek API Docs**: https://api-docs.deepseek.com/quick_start/pricing
 
 **Checklist**:
-- [ ] Main orchestrator model selected
-- [ ] Subagent model(s) selected
-- [ ] Summarization model selected
-- [ ] Router/classifier model selected (if needed)
-- [ ] Model selection rationale documented
-- [ ] API keys configured (`DEEPSEEK_API_KEY` env var)
+- [x] Main orchestrator model selected (`deepseek-v4-flash`)
+- [x] Subagent model(s) selected (`deepseek-v4-pro` / `deepseek-v4-flash`)
+- [x] Summarization model selected (`deepseek-v4-flash`)
+- [x] Router/classifier model selected (`deepseek-v4-flash`)
+- [x] Model selection rationale documented (commit `c1e131f`: migrate from Claude/Anthropic to DeepSeek V4)
+- [x] API keys configured (`DEEPSEEK_API_KEY` env var)
 
 ---
 
@@ -97,14 +99,14 @@ uv pip install pytest pytest-asyncio pytest-cov ruff mypy
 - **Skill `agent-harness-construction`**: Action space design principles
 
 **Checklist**:
-- [ ] File System tools defined (read, write, edit, glob, grep)
-- [ ] Shell tools defined (if needed)
-- [ ] Planning tools defined (write_todos)
-- [ ] Delegation tools defined (task)
-- [ ] Memory tools defined (edit_file to /memories/)
-- [ ] External API tools inventoried (search, fetch, etc.)
-- [ ] Custom tools scoped and named
-- [ ] Tool overlap analysis completed (no duplicate functionality)
+- [x] File System tools defined (read, write, edit, glob, grep)
+- [x] Shell tools defined (if needed)
+- [x] Planning tools defined (write_todos)
+- [x] Delegation tools defined (task)
+- [x] Memory tools defined (edit_file to /memories/)
+- [x] External API tools inventoried (search, fetch, etc.)
+- [x] Custom tools scoped and named (`src/harness_agent/tools.py` started)
+- [x] Tool overlap analysis completed (no duplicate functionality)
 
 ---
 
@@ -123,10 +125,11 @@ git commit -m "chore: initialize agent harness project"
 - **Rule**: `.claude/rules/common/git-workflow.md` — Commit format, branching strategy
 
 **Checklist**:
-- [ ] Git repo initialized
-- [ ] `.gitignore` configured (`.env`, `__pycache__/`, `.pytest_cache/`, etc.)
-- [ ] Initial commit with conventional format
-- [ ] Branch strategy defined (`main` + `feat/*` + `fix/*`)
+- [x] Git repo initialized
+- [x] `.gitignore` configured (`.env`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, v.v.)
+- [x] Initial commit with conventional format (`4b9f15e chore: initialize agent harness project`)
+- [x] Branch strategy defined (`main` + `feat/*` + `fix/*`)
+- [x] Recent commits follow conventional format (`d06a533`, `c1e131f`)
 
 ---
 
@@ -145,14 +148,14 @@ cat .claude/settings.json
 - **Skill `fewer-permission-prompts`**: Tối ưu allowlist để giảm permission prompts
 
 **Checklist**:
-- [ ] `.claude/settings.json` reviewed
-- [ ] Permissions allow list configured (pytest, ruff, mypy, git)
-- [ ] Permissions deny list configured (rm -rf, push --force, .env files)
-- [ ] PreToolUse hook configured (bash safety)
-- [ ] PostToolUse hook configured (auto ruff check)
-- [ ] Stop hook configured (auto pytest + ruff)
-- [ ] SessionStart hook configured (environment display)
-- [ ] `.mcp.json` MCP servers configured (codegraph, context7)
+- [x] `.claude/settings.json` reviewed
+- [x] Permissions allow list configured (uv, pytest, ruff, mypy, black, git)
+- [x] Permissions deny list configured (rm -rf, push --force, .env files)
+- [x] PreToolUse hook configured (bash safety warning)
+- [x] PostToolUse hook configured (auto ruff check on Edit/Write)
+- [x] Stop hook configured (auto pytest + ruff before session ends)
+- [x] SessionStart hook configured (Python/uv environment display)
+- [x] `.mcp.json` MCP servers configured (codegraph, context7)
 
 ---
 
@@ -161,12 +164,12 @@ cat .claude/settings.json
 **Mục tiêu**: Đảm bảo tất cả tài liệu tham khảo đã sẵn sàng.
 
 **Checklist**:
-- [ ] `CLAUDE.md` reviewed and updated
-- [ ] `docs/deep-agents/` — 9 reference docs available
-- [ ] `docs/guides/` — AIDLC lifecycle + plans available
-- [ ] Agent definitions reviewed (`.claude/agents/`)
-- [ ] Skill definitions reviewed (`.claude/skills/`)
-- [ ] Rules reviewed (`.claude/rules/`)
+- [x] `CLAUDE.md` reviewed and updated
+- [x] `docs/deep-agents/` — 10 reference docs available (README + 9 detail docs)
+- [x] `docs/guides/` — AIDLC lifecycle + plans available
+- [x] Agent definitions reviewed (5 agents in `.claude/agents/`)
+- [x] Skill definitions reviewed (6 skills in `.claude/skills/`)
+- [x] Rules reviewed (`.claude/rules/` common + python)
 
 ---
 
@@ -175,33 +178,41 @@ cat .claude/settings.json
 Tổng hợp tất cả checklist items:
 
 ### Environment
-- [ ] Python 3.11+ installed
-- [ ] `uv` package manager available
-- [ ] All dependencies installed (`deepagents`, `langchain`, `langgraph`, `langchain-deepseek`)
-- [ ] Dev tools installed (`pytest`, `ruff`, `mypy`)
-- [ ] `uv sync` clean
+- [x] Python 3.11+ installed (3.12.13 in venv)
+- [x] `uv` package manager available (0.10.6)
+- [x] All dependencies installed (`deepagents`, `langchain`, `langgraph`, `langchain-deepseek`)
+- [x] Dev tools installed (`pytest`, `ruff`, `mypy`)
+- [x] `pyproject.toml` configured (ruff, mypy, pytest, coverage, hatchling build)
+- [x] `uv sync` clean
 
 ### Model
-- [ ] Main orchestrator model selected & rationale documented
-- [ ] Subagent model(s) selected
-- [ ] Summarization model selected
-- [ ] API keys configured in environment variables
+- [x] Main orchestrator model selected (`deepseek-v4-flash`) & rationale documented
+- [x] Subagent model(s) selected (`deepseek-v4-pro` heavy, `deepseek-v4-flash` light)
+- [x] Summarization model selected (`deepseek-v4-flash`)
+- [x] API keys configured in environment variables (`DEEPSEEK_API_KEY`)
 
 ### Tools
-- [ ] Built-in middleware tools inventoried
-- [ ] Custom tools scoped
-- [ ] No tool overlap
+- [x] Built-in middleware tools inventoried (Filesystem, Shell, TodoList, SubAgent, Memory)
+- [x] Custom tools scoped (Web Search, URL Fetch, Code Execution, Database Query)
+- [x] No tool overlap
 
 ### Git & Config
-- [ ] Git repo initialized with `.gitignore`
-- [ ] Initial commit made
-- [ ] `.claude/settings.json` reviewed
-- [ ] Permissions, hooks configured
-- [ ] MCP servers configured
+- [x] Git repo initialized with `.gitignore`
+- [x] Initial commit made (`4b9f15e chore: initialize agent harness project`)
+- [x] `.claude/settings.json` reviewed
+- [x] Permissions, hooks configured (PreToolUse, PostToolUse, Stop, SessionStart)
+- [x] MCP servers configured (codegraph, context7)
 
 ### Docs
-- [ ] All reference docs confirmed accessible
-- [ ] `CLAUDE.md` current
+- [x] All reference docs confirmed accessible (10 deep-agents docs + AIDLC lifecycle + plans)
+- [x] `CLAUDE.md` current
+
+### Source Code (bắt đầu)
+- [x] `src/harness_agent/__init__.py` initialized
+- [x] `src/harness_agent/config.py` — config model với DeepSeek defaults
+- [x] `src/harness_agent/tools.py` — tool registry skeleton
+- [x] `tests/conftest.py` — shared fixtures
+- [x] `tests/__init__.py` initialized
 
 ---
 

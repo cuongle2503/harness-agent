@@ -1,12 +1,14 @@
 # Phase 1: Requirements & Analysis Plan
 
 > **Mục tiêu**: Xác định rõ use case, map requirements → capabilities, và viết requirements document cho agent.
+> **Trạng thái**: ✅ Hoàn thành (2026-06-18)
+> **Output**: [harness-agent-requirements.md](../../requirements/harness-agent-requirements.md)
 
 ## Prerequisites
 
-- [ ] Phase 0: Foundation hoàn thành
-- [ ] Môi trường dev sẵn sàng, model đã chọn
-- [ ] Đã đọc [AIDLC Lifecycle §1](../aidlc-lifecycle.md#1-requirements--analysis)
+- [x] Phase 0: Foundation hoàn thành
+- [x] Môi trường dev sẵn sàng, model đã chọn
+- [x] Đã đọc [AIDLC Lifecycle §1](../aidlc-lifecycle.md#1-requirements--analysis)
 
 ---
 
@@ -47,11 +49,11 @@
 ```
 
 **Checklist**:
-- [ ] Use case đã được phân loại rõ ràng
-- [ ] Agent type đã được chọn
-- [ ] Pattern đã được xác định
-- [ ] Rationale documented
-- [ ] Đã tham khảo `harness-architect` agent (nếu cần)
+- [x] Use case đã được phân loại rõ ràng
+- [x] Agent type đã được chọn
+- [x] Pattern đã được xác định
+- [x] Rationale documented
+- [x] Đã tham khảo `harness-architect` agent (nếu cần)
 
 ---
 
@@ -84,11 +86,11 @@ User Requirement          →  Deep Agents Capability          →  Implementati
 **Output**: Capability Mapping Table
 
 **Checklist**:
-- [ ] Tất cả user requirements đã được liệt kê
-- [ ] Mỗi requirement đã được map đến capability cụ thể
-- [ ] Implementation approach đã xác định cho mỗi capability
-- [ ] Không có requirement nào bị bỏ sót
-- [ ] Đã kiểm tra codebase hiện có (tránh trùng lặp)
+- [x] Tất cả user requirements đã được liệt kê
+- [x] Mỗi requirement đã được map đến capability cụ thể
+- [x] Implementation approach đã xác định cho mỗi capability
+- [x] Không có requirement nào bị bỏ sót
+- [x] Đã kiểm tra codebase hiện có (tránh trùng lặp)
 
 ---
 
@@ -117,11 +119,11 @@ User Requirement          →  Deep Agents Capability          →  Implementati
 5. **Clear contract** — input/output rõ ràng
 
 **Checklist**:
-- [ ] Subagents đã được xác định (nếu cần)
-- [ ] Mỗi subagent có responsibility rõ ràng
-- [ ] Tools cho mỗi subagent đã được liệt kê
-- [ ] Model cho mỗi subagent đã được chọn
-- [ ] Subagent design principles được tuân thủ
+- [x] Subagents đã được xác định (nếu cần)
+- [x] Mỗi subagent có responsibility rõ ràng
+- [x] Tools cho mỗi subagent đã được liệt kê
+- [x] Model cho mỗi subagent đã được chọn
+- [x] Subagent design principles được tuân thủ
 
 ---
 
@@ -143,11 +145,11 @@ User Requirement          →  Deep Agents Capability          →  Implementati
 - **MCP `codegraph`**: `codegraph_explore` — tìm memory patterns hiện có
 
 **Checklist**:
-- [ ] User preferences storage defined
-- [ ] Project context (AGENTS.md) structure planned
-- [ ] Session state persistence strategy defined
-- [ ] Org-level policies defined (if multi-tenant)
-- [ ] Ephemeral vs persistent storage boundaries clear
+- [x] User preferences storage defined
+- [x] Project context (AGENTS.md) structure planned
+- [x] Session state persistence strategy defined
+- [x] Org-level policies defined (if multi-tenant)
+- [x] Ephemeral vs persistent storage boundaries clear
 
 ---
 
@@ -158,12 +160,12 @@ User Requirement          →  Deep Agents Capability          →  Implementati
 **Cách thực hiện**: Dựa trên [AIDLC Lifecycle §5](../aidlc-lifecycle.md#5-security-hardening):
 
 **Checklist**:
-- [ ] Sandbox requirement defined (none / Docker / VM)
-- [ ] HITL approval requirements listed (những tool nào cần approval)
-- [ ] PII detection cần thiết?
-- [ ] Shell allow list scope defined
-- [ ] File system permission boundaries defined
-- [ ] Multi-tenant isolation requirements (nếu có)
+- [x] Sandbox requirement defined (none / Docker / VM)
+- [x] HITL approval requirements listed (những tool nào cần approval)
+- [x] PII detection cần thiết?
+- [x] Shell allow list scope defined
+- [x] File system permission boundaries defined
+- [x] Multi-tenant isolation requirements (nếu có)
 
 ---
 
@@ -172,12 +174,12 @@ User Requirement          →  Deep Agents Capability          →  Implementati
 **Mục tiêu**: Xác định các yêu cầu phi chức năng.
 
 **Checklist**:
-- [ ] Latency target defined (ms)
-- [ ] Max context window defined (tokens)
-- [ ] Streaming requirement (Yes/No)
-- [ ] Multi-tenant requirement (Yes/No)
-- [ ] Availability target (%)
-- [ ] Rate limiting strategy
+- [x] Latency target defined (ms)
+- [x] Max context window defined (tokens)
+- [x] Streaming requirement (Yes/No)
+- [x] Multi-tenant requirement (Yes/No)
+- [x] Availability target (%)
+- [x] Rate limiting strategy
 
 ---
 
@@ -191,50 +193,50 @@ User Requirement          →  Deep Agents Capability          →  Implementati
 - **Agent `planner`**: Review requirements document
 - **Skill `plan`**: Create implementation plan từ requirements
 
-**Output**: `docs/requirements/[agent-name]-requirements.md`
+**Output**: `docs/requirements/harness-agent-requirements.md` ✅
 
 **Checklist**:
-- [ ] Mục tiêu agent rõ ràng
-- [ ] Use cases documented
-- [ ] Tools required listed
-- [ ] Subagents defined (nếu có)
-- [ ] Memory requirements documented
-- [ ] Security requirements documented
-- [ ] Non-functional requirements documented
-- [ ] Requirements document reviewed bởi `planner` agent
+- [x] Mục tiêu agent rõ ràng
+- [x] Use cases documented
+- [x] Tools required listed
+- [x] Subagents defined (nếu có)
+- [x] Memory requirements documented
+- [x] Security requirements documented
+- [x] Non-functional requirements documented
+- [x] Requirements document reviewed bởi `planner` agent
 
 ---
 
 ## Phase 1 Completion Checklist
 
 ### Use Case & Classification
-- [ ] Use case classified (Single-task / Coordinator / Multi-Agent / Autonomous)
-- [ ] Agent type selected with rationale
-- [ ] Architecture pattern selected
+- [x] Use case classified (Coordinator Agent + Deep Agent Subagents)
+- [x] Agent type selected with rationale
+- [x] Architecture pattern selected
 
 ### Capability Mapping
-- [ ] All user requirements mapped to Deep Agents capabilities
-- [ ] Implementation approach clear for each
-- [ ] No gaps identified
+- [x] All user requirements mapped to Deep Agents capabilities
+- [x] Implementation approach clear for each
+- [x] No gaps identified
 
 ### Subagents
-- [ ] Subagents identified and defined (if applicable)
-- [ ] Each has clear responsibility, tools, model
+- [x] Subagents identified and defined (researcher, coder, reviewer, architect)
+- [x] Each has clear responsibility, tools, model
 
 ### Memory
-- [ ] Memory types defined (preferences, context, session, policies)
-- [ ] Storage backends mapped
+- [x] Memory types defined (preferences, context, session, policies)
+- [x] Storage backends mapped
 
 ### Security
-- [ ] Sandbox, HITL, PII requirements defined
-- [ ] Permission boundaries clear
+- [x] Sandbox, HITL, PII requirements defined
+- [x] Permission boundaries clear
 
 ### Non-Functional
-- [ ] Latency, context, streaming, multi-tenant targets set
+- [x] Latency, context, streaming, multi-tenant targets set
 
 ### Documentation
-- [ ] Requirements document written
-- [ ] Reviewed and approved
+- [x] Requirements document written (harness-agent-requirements.md)
+- [x] Reviewed and approved
 
 ---
 

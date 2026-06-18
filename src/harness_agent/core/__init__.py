@@ -1,4 +1,4 @@
-"""Harness Agent — Deep agent framework for multi-agent orchestration."""
+"""Core agent components — HarnessAgent, AgentOrchestrator, exceptions."""
 
 from harness_agent.core.agent import HarnessAgent
 from harness_agent.core.exceptions import (
@@ -9,20 +9,13 @@ from harness_agent.core.exceptions import (
     ToolNotFoundError,
 )
 from harness_agent.core.orchestrator import AgentOrchestrator
-from harness_agent.memory.hybrid_memory import HybridMemory, MemoryItem
-from harness_agent.tools.registry import ToolRegistry
-
-__version__ = "0.1.0"
 
 __all__ = [
     "AgentExecutionError",
     "AgentOrchestrator",
     "HarnessAgent",
     "HarnessError",
-    "HybridMemory",
-    "MemoryItem",
     "SubagentTimeoutError",
     "ToolExecutionError",
     "ToolNotFoundError",
-    "ToolRegistry",
 ]

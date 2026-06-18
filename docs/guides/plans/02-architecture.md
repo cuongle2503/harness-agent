@@ -1,13 +1,15 @@
 # Phase 2: Architecture & Design Plan
 
 > **Mục tiêu**: Thiết kế agent topology, middleware pipeline, backend strategy, và subagent network. Viết Architecture Decision Records (ADRs).
+> **Trạng thái**: ✅ Hoàn thành (2026-06-18)
+> **Outputs**: 6 ADRs, 5 system prompt files, prompt loader module
 
 ## Prerequisites
 
-- [ ] Phase 1: Requirements hoàn thành
-- [ ] Requirements document đã được viết và review
-- [ ] Đã đọc [AIDLC Lifecycle §2](../aidlc-lifecycle.md#2-architecture--design)
-- [ ] Đã đọc tất cả deep-agents reference docs liên quan
+- [x] Phase 1: Requirements hoàn thành
+- [x] Requirements document đã được viết và review
+- [x] Đã đọc [AIDLC Lifecycle §2](../aidlc-lifecycle.md#2-architecture--design)
+- [x] Đã đọc tất cả deep-agents reference docs liên quan
 
 ---
 
@@ -43,12 +45,12 @@ Cần 1 agent xử lý tất cả?
 **Output**: Topology Diagram + ADR
 
 **Checklist**:
-- [ ] Topology pattern đã được chọn
-- [ ] Decision rationale documented
-- [ ] Alternatives considered (ít nhất 2)
-- [ ] Trade-offs analyzed
-- [ ] Topology diagram created (ASCII hoặc Mermaid)
-- [ ] ADR written: `docs/adr/001-agent-topology.md`
+- [x] Topology pattern đã được chọn (Coordinator + Deep Agent Subagents)
+- [x] Decision rationale documented
+- [x] Alternatives considered (3: Single Agent, Handoff, Supervisor-Worker)
+- [x] Trade-offs analyzed
+- [x] Topology diagram created (ASCII)
+- [x] ADR written: `docs/adr/001-agent-topology.md`
 
 ---
 
@@ -117,13 +119,13 @@ middleware = [
 | Quản lý context | `ContextEditingMiddleware` | ☐ |
 
 **Checklist**:
-- [ ] Pipeline order designed theo nguyên tắc 5 lớp
-- [ ] Mỗi middleware có lý do cụ thể để included/excluded
-- [ ] Middleware selection matrix completed
-- [ ] Middleware parameters configured (thresholds, limits, etc.)
-- [ ] Custom middleware identified (nếu cần)
-- [ ] Pipeline diagram created
-- [ ] ADR written: `docs/adr/002-middleware-pipeline.md`
+- [x] Pipeline order designed theo nguyên tắc 5 lớp
+- [x] Mỗi middleware có lý do cụ thể để included/excluded
+- [x] Middleware selection matrix completed
+- [x] Middleware parameters configured (thresholds, limits, etc.)
+- [x] Custom middleware identified (nếu cần) — 4 future middleware noted
+- [x] Pipeline diagram created
+- [x] ADR written: `docs/adr/002-middleware-pipeline.md`
 
 ---
 
@@ -179,13 +181,13 @@ backend = CompositeBackend(
 - **MCP `codegraph`**: `codegraph_explore` — backend patterns trong codebase
 
 **Checklist**:
-- [ ] Default backend selected (StateBackend)
-- [ ] Persistent routes defined (/memories/, /policies/)
-- [ ] Namespace factories configured (user-scoped, org-scoped)
-- [ ] Sandbox backend configured (if code execution needed)
-- [ ] File format selected (v2 recommended)
-- [ ] Backend routing diagram created
-- [ ] ADR written: `docs/adr/003-backend-strategy.md`
+- [x] Default backend selected (StateBackend)
+- [x] Persistent routes defined (/memories/, /policies/)
+- [x] Namespace factories configured (user-scoped, org-scoped)
+- [x] Sandbox backend configured (if code execution needed)
+- [x] File format selected (v2 recommended)
+- [x] Backend routing diagram created
+- [x] ADR written: `docs/adr/003-backend-strategy.md`
 
 ---
 
@@ -222,13 +224,13 @@ subagents = [
 - **Skill `agent-harness-construction`**: Action space design cho subagents
 
 **Checklist**:
-- [ ] Subagents defined với name, description, system_prompt
-- [ ] Tools cho mỗi subagent được chọn (minimal set)
-- [ ] Model cho mỗi subagent được chọn
-- [ ] Middleware cho mỗi subagent configured
-- [ ] Subagent design principles verified
-- [ ] Subagent interaction diagram created
-- [ ] ADR written: `docs/adr/004-subagent-topology.md`
+- [x] Subagents defined với name, description, system_prompt (4 subagents)
+- [x] Tools cho mỗi subagent được chọn (minimal set)
+- [x] Model cho mỗi subagent được chọn (v4-pro: coder/architect, v4-flash: researcher/reviewer)
+- [x] Middleware cho mỗi subagent configured ([])
+- [x] Subagent design principles verified
+- [x] Subagent interaction diagram created
+- [x] ADR written: `docs/adr/004-subagent-topology.md`
 
 ---
 
@@ -272,12 +274,12 @@ preferences, feedback, and learnings there for future sessions.
 - **Skill `agent-harness-construction`**: Prompt engineering, context budgeting
 
 **Checklist**:
-- [ ] Main agent system prompt designed
-- [ ] Subagent system prompts designed
-- [ ] Prompt structure follows template
-- [ ] Context budget respected (<2000 tokens cho invariant parts)
-- [ ] Memory guidelines included
-- [ ] Tool usage instructions clear
+- [x] Main agent system prompt designed
+- [x] Subagent system prompts designed (4 subagents)
+- [x] Prompt structure follows template (7 sections)
+- [x] Context budget respected (~1,900 tokens cho invariant parts)
+- [x] Memory guidelines included
+- [x] Tool usage instructions clear
 
 ---
 
@@ -307,12 +309,12 @@ preferences, feedback, and learnings there for future sessions.
 ```
 
 **ADRs cần viết**:
-- [ ] ADR-001: Agent Topology
-- [ ] ADR-002: Middleware Pipeline
-- [ ] ADR-003: Backend Strategy
-- [ ] ADR-004: Subagent Topology
-- [ ] ADR-005: Model Selection (từ Phase 0)
-- [ ] ADR-006: System Prompt Architecture
+- [x] ADR-001: Agent Topology
+- [x] ADR-002: Middleware Pipeline
+- [x] ADR-003: Backend Strategy
+- [x] ADR-004: Subagent Topology
+- [x] ADR-005: Model Selection (từ Phase 0)
+- [x] ADR-006: System Prompt Architecture
 
 **Tools hỗ trợ**:
 - **Agent `harness-architect`**: Review tất cả ADRs
@@ -323,40 +325,67 @@ preferences, feedback, and learnings there for future sessions.
 ## Phase 2 Completion Checklist
 
 ### Topology
-- [ ] Agent topology pattern selected
-- [ ] Topology diagram created
-- [ ] ADR-001 written
+- [x] Agent topology pattern selected (Coordinator + Deep Agent Subagents)
+- [x] Topology diagram created (ASCII in ADR-001)
+- [x] ADR-001 written (`docs/adr/001-agent-topology.md`)
 
 ### Middleware
-- [ ] Pipeline order designed (5-layer principle)
-- [ ] Middleware selection matrix completed
-- [ ] Pipeline diagram created
-- [ ] ADR-002 written
+- [x] Pipeline order designed (6-layer principle)
+- [x] Middleware selection matrix completed (11 included, 4 future, 2 not needed)
+- [x] Pipeline diagram created (ASCII in ADR-002)
+- [x] ADR-002 written (`docs/adr/002-middleware-pipeline.md`)
 
 ### Backend
-- [ ] Backend strategy defined (CompositeBackend)
-- [ ] Routes and namespaces configured
-- [ ] Backend routing diagram created
-- [ ] ADR-003 written
+- [x] Backend strategy defined (CompositeBackend with 4 routes)
+- [x] Routes and namespaces configured (user-scoped, org-scoped)
+- [x] Backend routing diagram created (in ADR-003)
+- [x] ADR-003 written (`docs/adr/003-backend-strategy.md`)
 
 ### Subagents
-- [ ] Subagent definitions complete
-- [ ] Subagent interaction diagram created
-- [ ] ADR-004 written
+- [x] Subagent definitions complete (4 subagents: researcher, coder, reviewer, architect)
+- [x] Subagent interaction diagram created (in ADR-004)
+- [x] ADR-004 written (`docs/adr/004-subagent-topology.md`)
 
 ### System Prompt
-- [ ] Main agent system prompt designed
-- [ ] Subagent system prompts designed
+- [x] Main agent system prompt designed (7 sections, ~500 tokens)
+- [x] Subagent system prompts designed (4 subagents, modular .md files)
+- [x] Prompt loader module created (`src/harness_agent/prompts/__init__.py`)
 
 ### ADRs
-- [ ] All 6 ADRs written
-- [ ] All ADRs reviewed by `harness-architect`
+- [x] All 6 ADRs written
+- [x] ADRs reviewed by `harness-architect` (see review below)
 
 ### Design Review
-- [ ] Full architecture review với `harness-architect` agent
-- [ ] Security implications reviewed
-- [ ] Performance implications reviewed
-- [ ] Scalability reviewed (multi-tenant nếu cần)
+- [x] Full architecture review với `harness-architect` agent
+- [x] Security implications reviewed
+- [x] Performance implications reviewed
+- [x] Scalability reviewed (multi-tenant nếu cần)
+
+---
+
+## Design Review Findings (2026-06-18)
+
+Full review conducted by `harness-architect` agent. Key findings addressed:
+
+| # | Severity | Finding | Resolution |
+|---|----------|---------|------------|
+| 1 | CRITICAL | Subagents had `middleware: []` — no resilience/context mgmt | ✅ Fixed: Added `ContextEditingMiddleware` + `ToolRetryMiddleware` to all subagents |
+| 2 | CRITICAL | No sandbox ADR | 📋 Deferred to Phase 5 (ADR-007) |
+| 3 | CRITICAL | No checkpointing ADR | 📋 Deferred to Phase 6 (ADR-008) |
+| 4 | HIGH | Pricing discrepancy ADR-005 vs config.py | ✅ Fixed: Updated ADR-005 to match DeepSeek API official pricing |
+| 5 | HIGH | ShellToolMiddleware missing allow-list | ✅ Fixed: Added `shell_allow_list` config to ADR-002 |
+| 6 | HIGH | No error handling contract ADR | 📋 Deferred to Phase 3 (ADR-009) |
+| 7 | HIGH | Subagent context overflow risk | ✅ Fixed: Added `ContextEditingMiddleware` to heavy subagents |
+| 8 | HIGH | No custom tools architecture ADR | 📋 Deferred to Phase 3 (ADR-010) |
+| 9-17 | MEDIUM/LOW | Minor: ADR index, prompt caching, orphan tool, budget measurement | See [ADR index](../../adr/README.md) created; orphan `query_database` noted as Phase 6+ |
+
+### Deferred ADRs
+
+Các ADR bị hoãn lại cho các phase sau (documented in [ADR Index](../../adr/README.md#deferred-adrs-future-phases)):
+- **ADR-007**: Sandbox & Execution Isolation → Phase 5
+- **ADR-008**: Session State & Checkpointing → Phase 6
+- **ADR-009**: Error Handling Contract → Phase 3
+- **ADR-010**: Custom Tools Architecture → Phase 3
 
 ---
 
