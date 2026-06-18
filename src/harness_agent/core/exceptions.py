@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 _UNSET = object()
 
 
@@ -41,7 +43,7 @@ class AgentExecutionError(HarnessError):
         )
         super().__init__(msg)
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type, tuple[Any, ...], dict[str, str]]:
         return (
             AgentExecutionError,
             (self.agent_id, self.original_error),
@@ -67,7 +69,7 @@ class SubagentTimeoutError(HarnessError):
         )
         super().__init__(msg)
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type, tuple[Any, ...], dict[str, str]]:
         return (
             SubagentTimeoutError,
             (self.agent_id, self.timeout_seconds),
@@ -97,7 +99,7 @@ class ToolExecutionError(HarnessError):
         )
         super().__init__(msg)
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type, tuple[Any, ...], dict[str, str]]:
         return (
             ToolExecutionError,
             (self.tool_name, self.original_error),

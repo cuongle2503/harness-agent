@@ -61,7 +61,9 @@ class ToolRegistry:
                 "name": t.name,
                 "description": t.description,
                 "parameters": (
-                    t.args_schema.model_json_schema() if t.args_schema else {}
+                    t.args_schema.model_json_schema()  # type: ignore[union-attr]
+                    if t.args_schema
+                    else {}
                 ),
             }
             for t in self._tools.values()

@@ -39,7 +39,7 @@ def create_hybrid_backend(
             store=store,
             file_format="v2",
         )
-    routes["/output/"] = FilesystemBackend(root_dir=output_dir)
+    routes["/output/"] = FilesystemBackend(root_dir=output_dir, virtual_mode=True)
 
     return CompositeBackend(
         default=StateBackend(),
