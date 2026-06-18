@@ -8,6 +8,10 @@
         "HTTPS_PROXY": "http://10.100.101.6:8080",
         "NO_PROXY": "localhost,127.0.0.1,::1"
       }
+    },
+    "codegraph": {
+      "command": "npx",
+      "args": ["-y", "codegraph", "serve", "--mcp", "--path", "/home/pc/my-projects/harness-agent"]
     }
   }
 }

@@ -12,7 +12,9 @@
       "Bash(git status)",
       "Bash(git diff *)",
       "Bash(git log *)",
-      "Bash(git branch *)"
+      "Bash(git branch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -41,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if ls src/**/*.py 2>/dev/null; then ruff check src/ --output-format concise 2>/dev/null || true; fi",
+            "command": "if ls src/**/*.py 2>/dev/null; then source .venv/bin/activate 2>/dev/null && ruff check src/ --output-format concise 2>/dev/null || true; fi",
             "async": true,
             "timeout": 15
           }
@@ -54,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f pyproject.toml ] && [ -d tests ]; then python -m pytest tests/ -x -q 2>/dev/null || echo '⚠️  Tests failed or not runnable yet'; fi",
+            "command": "if [ -f pyproject.toml ] && [ -d tests ]; then source .venv/bin/activate 2>/dev/null && python -m pytest tests/ -x -q 2>/dev/null || echo '⚠️  Tests failed or not runnable yet'; fi",
             "async": true,
             "timeout": 120
           }
@@ -65,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if ls src/**/*.py 2>/dev/null; then ruff check src/ --output-format concise 2>/dev/null && echo '✅ Lint clean' || echo '⚠️  Lint issues found'; fi",
+            "command": "if ls src/**/*.py 2>/dev/null; then source .venv/bin/activate 2>/dev/null && ruff check src/ --output-format concise 2>/dev/null && echo '✅ Lint clean' || echo '⚠️  Lint issues found'; fi",
             "async": true,
             "timeout": 15
           }
@@ -78,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '🐍 Python: '\"$(python3 --version 2>&1)\"'; uv: '\"$(uv --version 2>&1 || echo 'not installed')\""
+            "command": "echo '🐍 Python (venv): '\"$(source .venv/bin/activate 2>/dev/null && python3 --version 2>&1 || echo 'venv not active')\"'; uv: '\"$(uv --version 2>&1)\""
           }
         ]
       }
