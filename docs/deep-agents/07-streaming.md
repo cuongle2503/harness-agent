@@ -208,11 +208,11 @@ agent.stream(
 
 ```python
 from deepagents import create_deep_agent
-from langchain.chat_models import init_chat_model
+from langchain_deepseek import ChatDeepSeek
 import asyncio
 
 async def main():
-    model = init_chat_model("claude-sonnet-4-6")
+    model = ChatDeepSeek(model="deepseek-v4-flash")
     agent = create_deep_agent(model=model)
 
     config = {"configurable": {"thread_id": "stream-demo"}}

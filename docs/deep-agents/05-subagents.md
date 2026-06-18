@@ -32,7 +32,7 @@ from deepagents.backends import StateBackend
 backend = StateBackend()
 
 agent = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     middleware=[
         SubAgentMiddleware(
             backend=backend,
@@ -42,7 +42,7 @@ agent = create_agent(
                     "description": "Searches the web and returns structured research summaries.",
                     "system_prompt": "You are a thorough researcher. Use available search tools...",
                     "tools": [search_tool, fetch_url_tool],
-                    "model": "claude-sonnet-4-6",
+                    "model": "deepseek-v4-flash",
                     "middleware": [],  # Subagent-specific middleware
                 },
             ],
@@ -158,13 +158,13 @@ def transfer_to_support(runtime: ToolRuntime) -> Command:
 
 # Tạo agents với handoff tools
 sales_agent = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     tools=[transfer_to_support],
     system_prompt="You are a sales agent. Transfer to support for technical issues.",
 )
 
 support_agent = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     tools=[transfer_to_sales],
     system_prompt="You are a support agent. Transfer to sales for pricing.",
 )
@@ -241,7 +241,7 @@ backend = CompositeBackend(
 )
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     tools=[search],
     system_prompt="You are a project coordinator. Delegate research to researcher subagent.",
     middleware=[
@@ -255,7 +255,7 @@ agent = create_deep_agent(
                     "description": "Research topics and return structured summaries.",
                     "system_prompt": "Conduct thorough research and synthesize findings.",
                     "tools": [search],
-                    "model": "claude-sonnet-4-6",
+                    "model": "deepseek-v4-flash",
                     "middleware": [],
                 },
                 {
@@ -263,7 +263,7 @@ agent = create_deep_agent(
                     "description": "Write and execute Python code.",
                     "system_prompt": "Write clean, well-documented Python code.",
                     "tools": [execute_python],
-                    "model": "claude-sonnet-4-6",
+                    "model": "deepseek-v4-flash",
                     "middleware": [],
                 },
             ],

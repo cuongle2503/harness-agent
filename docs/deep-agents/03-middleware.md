@@ -74,7 +74,7 @@ from deepagents.backends import StateBackend
 backend = StateBackend()
 
 agent = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     middleware=[
         SubAgentMiddleware(
             backend=backend,
@@ -84,7 +84,7 @@ agent = create_agent(
                     "description": "Searches and returns a structured summary.",
                     "system_prompt": "Use the search tool to research.",
                     "tools": [search_tool],
-                    "model": "claude-sonnet-4-6",
+                    "model": "deepseek-v4-flash",
                     "middleware": [],  # subagent cũng có thể có middleware riêng
                 },
                 {
@@ -92,7 +92,7 @@ agent = create_agent(
                     "description": "Reviews code for bugs and style issues.",
                     "system_prompt": "You are a thorough code reviewer.",
                     "tools": [read_file, grep_tool],
-                    "model": "claude-sonnet-4-6",
+                    "model": "deepseek-v4-flash",
                 },
             ],
         ),
@@ -133,7 +133,7 @@ from deepagents.backends import FilesystemBackend
 backend = FilesystemBackend(root_dir="/data")
 
 summ = SummarizationMiddleware(
-    model="gpt-5.4-mini",       # Model dùng để summarize
+    model="deepseek-v4-flash",       # Model dùng để summarize
     backend=backend,             # Nơi lưu bản tóm tắt
     trigger=("fraction", 0.85),  # Trigger khi dùng 85% context window
     keep=("fraction", 0.10),     # Giữ 10% context gần nhất
@@ -164,7 +164,7 @@ from langchain.agents.middleware import TodoListMiddleware
 from langchain.agents import create_agent
 
 agent = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     middleware=[
         TodoListMiddleware(
             system_prompt="Use the write_todos tool to plan and track your tasks.",
@@ -194,7 +194,7 @@ Dừng execution để chờ human approval trước khi thực hiện tool call
 from langchain.middleware import HumanInTheLoopMiddleware
 
 agent = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     middleware=[
         HumanInTheLoopMiddleware(
             interrupt_on=["write_file", "execute_command"],  # Các tool cần approval
@@ -213,10 +213,10 @@ Tự động chuyển sang model dự phòng khi primary fail.
 from langchain.middleware import ModelFallbackMiddleware
 
 agent = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     middleware=[
         ModelFallbackMiddleware(
-            fallback_models=["gpt-5.4", "gemini-3.5-flash"],
+            fallback_models=["deepseek-v4-flash"],
             max_retries=3,
         ),
     ],
@@ -233,7 +233,7 @@ Phát hiện và xử lý Personally Identifiable Information.
 from langchain.middleware import PIIMiddleware
 
 agent = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     middleware=[PIIMiddleware()],
 )
 # Agent sẽ tự động phát hiện và cảnh báo về PII

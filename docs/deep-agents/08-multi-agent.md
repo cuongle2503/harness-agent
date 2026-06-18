@@ -71,13 +71,13 @@ def transfer_to_support(runtime: ToolRuntime) -> Command:
 
 # 3. Tạo agents
 sales_agent = create_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     tools=[transfer_to_support],
     system_prompt="You are a sales agent. Transfer technical issues to support.",
 )
 
 support_agent = create_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     tools=[transfer_to_sales],
     system_prompt="You are a support agent. Transfer pricing questions to sales.",
 )
@@ -129,9 +129,9 @@ Một router agent phân tích query và gửi đến đúng knowledge base agen
 from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
-from langchain.chat_models import init_chat_model
+from langchain_deepseek import ChatDeepSeek
 
-router_llm = init_chat_model("claude-sonnet-4-6")
+router_llm = ChatDeepSeek(model="deepseek-v4-flash")
 
 # Structured output schema
 class Classification(BaseModel):
@@ -225,7 +225,7 @@ from langchain.checkpoint.memory import InMemorySaver
 
 # Tạo agents
 alice = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     tools=[
         add,
         create_handoff_tool(
@@ -238,7 +238,7 @@ alice = create_agent(
 )
 
 bob = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     tools=[
         create_handoff_tool(
             agent_name="Alice",
@@ -357,7 +357,7 @@ app = graph.compile()
 # 2. Spawn researcher subagent cho product research
 
 sales_agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     tools=[transfer_to_support],
     middleware=[
         SubAgentMiddleware(
@@ -367,7 +367,7 @@ sales_agent = create_deep_agent(
                 "description": "Research product details",
                 "system_prompt": "Research product features and pricing...",
                 "tools": [search_product_db],
-                "model": "claude-sonnet-4-6",
+                "model": "deepseek-v4-flash",
             }],
         ),
     ],

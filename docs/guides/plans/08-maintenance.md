@@ -223,7 +223,7 @@ __version__ = "1.2.0"
 
 ### Changed
 - System prompt updated với citation requirements
-- Model upgraded from claude-sonnet-4-5 to claude-sonnet-4-6
+- Model upgraded from deepseek-v4-flash to deepseek-v4-flash
 
 ### Fixed
 - BUG-003: Subagent timeout khi research topic quá rộng

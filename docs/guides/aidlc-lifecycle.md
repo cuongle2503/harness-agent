@@ -25,7 +25,7 @@ Trước khi bắt đầu xây dựng agent, cần chuẩn bị foundation vữn
 ### 0.1 Environment Setup
 
 ```bash
-pip install deepagents langchain langgraph langchain-anthropic
+pip install deepagents langchain langgraph langchain-deepseek
 # Optional: deepagents-code cho CLI/server mode
 pip install deepagents-code
 # Dev dependencies
@@ -34,33 +34,44 @@ pip install pytest pytest-asyncio pytest-cov ruff mypy
 
 ### 0.2 Model Selection Decision Matrix
 
-| Tiêu chí | Claude Opus 4.8 | Claude Sonnet 4.6 | GPT-5.4 | Gemini 3.5 Flash |
-|----------|-----------------|-------------------|---------|------------------|
-| Complex reasoning | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Tool calling accuracy | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Cost efficiency | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Subagent delegation | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Context window | 200K | 200K | 128K | 1M |
+Tất cả model dùng **DeepSeek V4 family** (phát hành 2026-04-24) qua DeepSeek API (OpenAI-compatible endpoint).
+
+| Tiêu chí | deepseek-v4-pro | deepseek-v4-flash |
+|----------|-----------------|-------------------|
+| Complex reasoning | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| Tool calling accuracy | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Cost efficiency | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Context window | 1M | 1M |
+| Max output | 384K | 384K |
+| Total params | 1.6T | 284B |
+| Active params | 49B | 13B |
+| Input (cache miss) | $0.435/1M | $0.14/1M |
+| Output | $0.87/1M | $0.28/1M |
+| Concurrency | 500 | 2500 |
 
 **Nguyên tắc chọn model**:
-- **Main agent (orchestrator)**: Claude Opus 4.8 hoặc Claude Sonnet 4.6 — tool calling reliability là ưu tiên số 1
-- **Subagents (workers)**: Có thể dùng model nhỏ hơn/rẻ hơn nếu task đơn giản
-- **Summarization**: Model nhỏ, rẻ (GPT-5.4-mini) — chỉ cần tóm tắt text
-- **Router/Classifier**: Model nhanh, rẻ — structured output đơn giản
+- **Main agent (orchestrator)**: `deepseek-v4-flash` — tool calling reliability + tốc độ + giá rẻ. Orchestration không cần deep reasoning.
+- **Subagents (heavy)**: `deepseek-v4-pro` — complex reasoning, code generation, architecture. Dùng model mạnh nhất cho task nặng.
+- **Subagents (light)**: `deepseek-v4-flash` — task đơn giản, nhanh, rẻ, 2500 QPS.
+- **Summarization**: `deepseek-v4-flash` — 1M context, rẻ, chỉ cần tóm tắt text.
+- **Router/Classifier**: `deepseek-v4-flash` — structured output nhanh, rẻ.
 
 ```python
-from langchain.chat_models import init_chat_model
+from langchain_deepseek import ChatDeepSeek
 
-# Main orchestrator
-main_model = init_chat_model("claude-sonnet-4-6")
+# Main orchestrator — dùng v4-flash cho tốc độ + tool calling
+main_model = ChatDeepSeek(model="deepseek-v4-flash", temperature=0)
 
-# Subagent có thể dùng model khác
+# Subagent dùng model khác nhau theo task
 subagent_models = {
-    "researcher": init_chat_model("claude-sonnet-4-6"),
-    "coder": init_chat_model("claude-sonnet-4-6"),
-    "summarizer": init_chat_model("gpt-5.4-mini"),
+    "architect": ChatDeepSeek(model="deepseek-v4-pro", temperature=0),
+    "coder": ChatDeepSeek(model="deepseek-v4-pro", temperature=0),
+    "researcher": ChatDeepSeek(model="deepseek-v4-pro", temperature=0),
+    "summarizer": ChatDeepSeek(model="deepseek-v4-flash", temperature=0),
 }
 ```
+
+> **Lưu ý**: Model name cũ `deepseek-chat` / `deepseek-reasoner` sẽ bị deprecated vào 2026-07-24. Luôn dùng `deepseek-v4-flash` / `deepseek-v4-pro` cho dự án mới.
 
 ### 0.3 Tool Inventory Assessment
 
@@ -250,7 +261,7 @@ subagents = [
         "description": "Web research, data gathering, synthesis",
         "system_prompt": "You are a thorough researcher...",
         "tools": [search, fetch_url, extract_data],
-        "model": "claude-sonnet-4-6",      # Có thể dùng model nhỏ hơn
+        "model": "deepseek-v4-flash",      # Có thể dùng model nhỏ hơn
         "middleware": [],                    # Subagent thường không cần middleware
     },
     {
@@ -258,7 +269,7 @@ subagents = [
         "description": "Review code for bugs, style, security",
         "system_prompt": "You are a thorough code reviewer...",
         "tools": [read_file, grep_tool],
-        "model": "claude-sonnet-4-6",
+        "model": "deepseek-v4-flash",
         "middleware": [],
     },
     {
@@ -266,7 +277,7 @@ subagents = [
         "description": "System design and architecture decisions",
         "system_prompt": "You are a senior software architect...",
         "tools": [read_file, search],
-        "model": "claude-opus-4-8",         # Model mạnh hơn cho architecture
+        "model": "deepseek-v4-pro",         # Model mạnh hơn cho architecture
         "middleware": [],
     },
 ]
@@ -323,7 +334,7 @@ from deepagents import create_deep_agent
 def research_agent():
     """Tạo research agent với mock tools."""
     return create_deep_agent(
-        model="claude-sonnet-4-6",
+        model="deepseek-v4-flash",
         tools=[mock_search],
         middleware=[
             TodoListMiddleware(),
@@ -450,7 +461,7 @@ def create_research_agent(
     fetch_tool: BaseTool,
     *,
     memory_backend: StoreBackend | None = None,
-    summarization_model: str = "gpt-5.4-mini",
+    summarization_model: str = "deepseek-v4-flash",
 ) -> CompiledStateGraph:
     """Tạo research agent với đầy đủ capabilities.
 
@@ -775,7 +786,7 @@ jobs:
       - run: pytest tests/unit/ -v --cov=src --cov-report=term
       - run: pytest tests/integration/ -v  # Cần API keys
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 ```
 
 ---
@@ -795,7 +806,7 @@ Trước khi deploy, phải pass TẤT CẢ các check sau:
 import os
 
 # ✅ GOOD
-api_key = os.environ["ANTHROPIC_API_KEY"]
+api_key = os.environ["DEEPSEEK_API_KEY"]
 
 # ❌ BAD
 api_key = "sk-ant-abc123..."
@@ -904,10 +915,10 @@ grep -r "subprocess.*shell=True" src/  # Không được dùng shell=True
 ```python
 # cli_agent.py
 from deepagents_code.agent import create_cli_agent
-from langchain_anthropic import ChatAnthropic
+from langchain_deepseek import ChatDeepSeek
 
 def main():
-    model = ChatAnthropic(model="claude-sonnet-4-6")
+    model = ChatDeepSeek(model="deepseek-v4-flash")
     agent, backend = create_cli_agent(
         model=model,
         assistant_id="my-coding-assistant",
@@ -943,7 +954,7 @@ async def lifespan(app: FastAPI):
     # Startup: khởi tạo agent server
     async with server_session(
         assistant_id="prod-agent",
-        model_name="claude-sonnet-4-6",
+        model_name="deepseek-v4-flash",
         sandbox_type="docker",
         host="127.0.0.1",
         port=2024,
@@ -1022,7 +1033,7 @@ services:
     ports:
       - "2024:2024"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - AGENT_ENV=production
     volumes:
       - agent-memory:/memories
@@ -1292,7 +1303,7 @@ __version__ = "1.2.0"
 
 ### Changed
 - System prompt updated với citation requirements
-- Model upgraded from claude-sonnet-4-5 to claude-sonnet-4-6
+- Model upgraded from deepseek-v4-flash to deepseek-v4-flash
 
 ### Fixed
 - BUG-003: Subagent timeout khi research topic quá rộng
@@ -1333,7 +1344,7 @@ User Feedback → Phân tích → Cập nhật → Test → Deploy
 from deepagents import create_deep_agent
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     system_prompt="You are a helpful assistant.",
 )
 result = agent.invoke({
@@ -1363,7 +1374,7 @@ def create_research_agent(model, search_tool, fetch_tool, store=None):
             TodoListMiddleware(),
             FilesystemMiddleware(backend=backend),
             SubAgentMiddleware(backend=backend, subagents=[...]),
-            SummarizationMiddleware(model="gpt-5.4-mini", backend=backend),
+            SummarizationMiddleware(model="deepseek-v4-flash", backend=backend),
         ],
         backend=backend,
         store=store,

@@ -381,7 +381,7 @@ jobs:
       - run: pytest tests/unit/ -v --cov=src --cov-report=term --cov-fail-under=80
       - run: pytest tests/integration/ -v
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 
   adversarial:
     runs-on: ubuntu-latest
@@ -404,7 +404,7 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: pytest tests/evaluation/ -v
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 ```
 
 **Tools hỗ trợ**:

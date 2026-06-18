@@ -64,9 +64,9 @@ agent, backend = create_cli_agent(
 
 ```python
 from deepagents_code.agent import create_cli_agent
-from langchain_anthropic import ChatAnthropic
+from langchain_deepseek import ChatDeepSeek
 
-model = ChatAnthropic(model="claude-sonnet-4-6")
+model = ChatDeepSeek(model="deepseek-v4-flash")
 
 agent, backend = create_cli_agent(
     model=model,
@@ -334,7 +334,7 @@ create_cli_agent(
 
 ```python
 agent, backend = create_cli_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     assistant_id="dev-assistant",
     sandbox_type="docker",
     auto_approve=True,
@@ -349,7 +349,7 @@ agent, backend = create_cli_agent(
 ```python
 async with server_session(
     assistant_id="prod-assistant",
-    model_name="claude-sonnet-4-6",
+    model_name="deepseek-v4-flash",
     sandbox_type="docker",
     host="0.0.0.0",
     port=2024,

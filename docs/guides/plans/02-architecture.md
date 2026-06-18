@@ -204,7 +204,7 @@ subagents = [
         "description": "What it does...",  # Agent dùng để chọn subagent
         "system_prompt": "You are a...",   # System prompt riêng
         "tools": [tool1, tool2],           # Tools riêng (minimal)
-        "model": "claude-sonnet-4-6",      # Có thể khác main agent
+        "model": "deepseek-v4-flash",      # Có thể khác main agent
         "middleware": [],                  # Thường để [] trừ khi cần
     },
 ]

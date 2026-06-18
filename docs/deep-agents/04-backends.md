@@ -15,7 +15,7 @@ from deepagents.middleware.filesystem import FilesystemMiddleware
 backend = StateBackend()
 
 agent = create_agent(
-    "claude-sonnet-4-6",
+    "deepseek-v4-flash",
     middleware=[FilesystemMiddleware(backend=backend)],
 )
 ```
@@ -41,7 +41,7 @@ backend = StoreBackend(
 )
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     backend=backend,
     store=store,
 )
@@ -90,7 +90,7 @@ from deepagents.backends import FilesystemBackend
 backend = FilesystemBackend(root_dir="/data/agent-workspace")
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     middleware=[FilesystemMiddleware(backend=backend)],
 )
 ```
@@ -120,7 +120,7 @@ backend = CompositeBackend(
 )
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     middleware=[FilesystemMiddleware(backend=backend)],
     memory=[
         "/memories/preferences.md",
@@ -232,7 +232,7 @@ backend = CompositeBackend(
 
 # Subagent dùng chung backend với main agent
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     backend=backend,
     middleware=[
         FilesystemMiddleware(backend=backend),

@@ -22,8 +22,8 @@
 python3 --version  # Phải >= 3.11
 
 # Cài đặt dependencies với uv
-uv sync
-uv pip install deepagents langchain langgraph langchain-anthropic
+uv sync --extra dev
+uv pip install deepagents langchain langgraph langchain-deepseek
 uv pip install deepagents-code  # Cho CLI/Server mode
 
 # Dev dependencies
@@ -39,7 +39,7 @@ uv pip install pytest pytest-asyncio pytest-cov ruff mypy
 - [ ] `uv` package manager available
 - [ ] `deepagents` installed
 - [ ] `langchain` + `langgraph` installed
-- [ ] `langchain-anthropic` installed
+- [ ] `langchain-deepseek` installed
 - [ ] `deepagents-code` installed (optional, cho CLI/Server)
 - [ ] Dev tools: `pytest`, `ruff`, `mypy` installed
 - [ ] `uv sync` clean (không lỗi)
@@ -48,21 +48,21 @@ uv pip install pytest pytest-asyncio pytest-cov ruff mypy
 
 ### Step 0.2: Model Selection
 
-**Mục tiêu**: Chọn model phù hợp cho main agent, subagents, và summarization.
+**Mục tiêu**: Chọn model phù hợp cho main agent, subagents, và summarization — tất cả dùng DeepSeek V4 family.
 
 **Cách thực hiện**: Dùng decision matrix từ [AIDLC Lifecycle §0.2](../aidlc-lifecycle.md#02-model-selection-decision-matrix)
 
 | Vai trò | Model khuyến nghị | Lý do |
 |---------|-------------------|-------|
-| **Main orchestrator** | `claude-sonnet-4-6` | Tool calling reliability, subagent delegation |
-| **Subagents (heavy)** | `claude-sonnet-4-6` | Complex reasoning |
-| **Subagents (light)** | `claude-haiku-4-5` | Cost efficiency cho task đơn giản |
-| **Summarization** | `gpt-5.4-mini` | Chỉ cần tóm tắt text |
-| **Router/Classifier** | `claude-haiku-4-5` | Structured output đơn giản, nhanh |
+| **Main orchestrator** | `deepseek-v4-flash` | Tool calling nhanh, rẻ ($0.14/1M input), 2500 QPS |
+| **Subagents (heavy)** | `deepseek-v4-pro` | Reasoning mạnh nhất (1.6T params), code generation |
+| **Subagents (light)** | `deepseek-v4-flash` | Cost efficiency cho task đơn giản |
+| **Summarization** | `deepseek-v4-flash` | 1M context, $0.28/1M output |
+| **Router/Classifier** | `deepseek-v4-flash` | Structured output nhanh, rẻ |
 
 **Tools hỗ trợ**:
 - **MCP `context7`**: `resolve-library-id` → `query-docs` để tra cứu model capabilities mới nhất
-- **Skill `claude-api`**: Tham khảo model pricing, params, capabilities
+- **DeepSeek API Docs**: https://api-docs.deepseek.com/quick_start/pricing
 
 **Checklist**:
 - [ ] Main orchestrator model selected
@@ -70,7 +70,7 @@ uv pip install pytest pytest-asyncio pytest-cov ruff mypy
 - [ ] Summarization model selected
 - [ ] Router/classifier model selected (if needed)
 - [ ] Model selection rationale documented
-- [ ] API keys configured (`ANTHROPIC_API_KEY` env var)
+- [ ] API keys configured (`DEEPSEEK_API_KEY` env var)
 
 ---
 
@@ -177,7 +177,7 @@ Tổng hợp tất cả checklist items:
 ### Environment
 - [ ] Python 3.11+ installed
 - [ ] `uv` package manager available
-- [ ] All dependencies installed (`deepagents`, `langchain`, `langgraph`, `langchain-anthropic`)
+- [ ] All dependencies installed (`deepagents`, `langchain`, `langgraph`, `langchain-deepseek`)
 - [ ] Dev tools installed (`pytest`, `ruff`, `mypy`)
 - [ ] `uv sync` clean
 

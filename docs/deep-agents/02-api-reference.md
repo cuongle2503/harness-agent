@@ -38,16 +38,16 @@ Chat model để sử dụng. Hỗ trợ cả string shorthand và BaseChatModel
 
 ```python
 # String shorthand
-agent = create_deep_agent(model="claude-sonnet-4-6")
+agent = create_deep_agent(model="deepseek-v4-flash")
 
-# Hoặc từ init_chat_model
-from langchain.chat_models import init_chat_model
-model = init_chat_model("claude-sonnet-4-6", model_provider="anthropic")
+# Hoặc từ ChatDeepSeek trực tiếp
+from langchain_deepseek import ChatDeepSeek
+model = ChatDeepSeek(model="deepseek-v4-flash")
 agent = create_deep_agent(model=model)
 
-# Hoặc từ ChatAnthropic trực tiếp
-from langchain_anthropic import ChatAnthropic
-model = ChatAnthropic(model="claude-sonnet-4-6")
+# Hoặc từ ChatDeepSeek trực tiếp
+from langchain_deepseek import ChatDeepSeek
+model = ChatDeepSeek(model="deepseek-v4-flash")
 agent = create_deep_agent(model=model)
 ```
 
@@ -69,7 +69,7 @@ def calculate(expression: str) -> float:
     return eval(expression)
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     tools=[search, calculate],
 )
 ```
@@ -80,7 +80,7 @@ System prompt để cấu hình hành vi agent.
 
 ```python
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     system_prompt="""You are a helpful coding assistant.
 - Write clean, well-documented code
 - Always include type hints
@@ -98,11 +98,11 @@ from deepagents.middleware import FilesystemMiddleware, SubAgentMiddleware
 from deepagents.middleware.summarization import SummarizationMiddleware
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     middleware=[
         TodoListMiddleware(),
         FilesystemMiddleware(backend=backend),
-        SummarizationMiddleware(model="gpt-5.4-mini", backend=backend),
+        SummarizationMiddleware(model="deepseek-v4-flash", backend=backend),
         SubAgentMiddleware(backend=backend, subagents=[...]),
     ],
 )
@@ -121,19 +121,19 @@ subagents = [
         "description": "Research agent for web searches and data gathering",
         "system_prompt": "You are a researcher...",
         "tools": [search],
-        "model": "claude-sonnet-4-6",
+        "model": "deepseek-v4-flash",
     },
     {
         "name": "coder",
         "description": "Code execution and analysis agent",
         "system_prompt": "You are a coder...",
         "tools": [execute_code],
-        "model": "claude-sonnet-4-6",
+        "model": "deepseek-v4-flash",
     },
 ]
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     subagents=subagents,
 )
 ```
@@ -144,7 +144,7 @@ Danh sách đường dẫn file memory để load. Các file này sẽ được 
 
 ```python
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     memory=[
         "/memories/preferences.md",
         "/memories/user_info.md",
@@ -211,7 +211,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 checkpointer = InMemorySaver()
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     checkpointer=checkpointer,
 )
 
@@ -230,7 +230,7 @@ from langgraph.store.memory import InMemoryStore
 
 store = InMemoryStore()
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     store=store,
 )
 ```
@@ -248,7 +248,7 @@ class AnalysisResult(BaseModel):
     recommendations: list[str]
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     response_format=AnalysisResult,
 )
 ```
@@ -258,7 +258,7 @@ agent = create_deep_agent(
 Bật debug mode để log chi tiết.
 
 ```python
-agent = create_deep_agent(model="claude-sonnet-4-6", debug=True)
+agent = create_deep_agent(model="deepseek-v4-flash", debug=True)
 ```
 
 ### `name` — `str | None`
@@ -291,7 +291,7 @@ from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
 from deepagents.middleware import FilesystemMiddleware, SubAgentMiddleware
 from langchain.agents.middleware import TodoListMiddleware
-from langchain.chat_models import init_chat_model
+from langchain_deepseek import ChatDeepSeek
 from langchain.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
@@ -307,7 +307,7 @@ def calculate(expr: str) -> float:
     return float(eval(expr))
 
 # 2. Khởi tạo model
-model = init_chat_model("claude-sonnet-4-6")
+model = ChatDeepSeek(model="deepseek-v4-flash")
 
 # 3. Cấu hình hybrid backend
 backend = CompositeBackend(
@@ -321,7 +321,7 @@ researcher_subagent = {
     "description": "Research topics using web search and return structured summaries.",
     "system_prompt": "You are a researcher. Use the search tool to find information.",
     "tools": [search],
-    "model": "claude-sonnet-4-6",
+    "model": "deepseek-v4-flash",
 }
 
 # 5. Tạo agent

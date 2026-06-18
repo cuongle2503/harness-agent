@@ -338,7 +338,7 @@ def create_research_agent(
     fetch_tool: BaseTool,
     *,
     store: Any = None,
-    summarization_model: str = "gpt-5.4-mini",
+    summarization_model: str = "deepseek-v4-flash",
 ) -> CompiledStateGraph:
     """Tạo research agent với đầy đủ capabilities."""
     backend = CompositeBackend(

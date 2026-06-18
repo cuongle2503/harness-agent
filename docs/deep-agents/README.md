@@ -70,14 +70,14 @@ from deepagents.middleware.summarization import (
     SummarizationMiddleware,
     SummarizationToolMiddleware,
 )
-from langchain.chat_models import init_chat_model
+from langchain_deepseek import ChatDeepSeek
 
-model = init_chat_model("claude-sonnet-4-6")
+model = ChatDeepSeek(model="deepseek-v4-flash")
 
 backend = FilesystemBackend(root_dir="/data")
 
 summ = SummarizationMiddleware(
-    model="gpt-5.4-mini",
+    model="deepseek-v4-flash",
     backend=backend,
     trigger=("fraction", 0.85),
     keep=("fraction", 0.10),

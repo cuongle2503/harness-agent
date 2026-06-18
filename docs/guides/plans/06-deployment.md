@@ -43,14 +43,14 @@
 ```python
 # cli_agent.py
 from deepagents_code.agent import create_cli_agent
-from langchain_anthropic import ChatAnthropic
+from langchain_deepseek import ChatDeepSeek
 from deepagents_code._server_config import MCPServerInfo
 import os
 
 def main() -> None:
-    model = ChatAnthropic(
-        model="claude-sonnet-4-6",
-        api_key=os.environ["ANTHROPIC_API_KEY"],
+    model = ChatDeepSeek(
+        model="deepseek-v4-flash",
+        api_key=os.environ["DEEPSEEK_API_KEY"],
     )
 
     agent, backend = create_cli_agent(
@@ -133,7 +133,7 @@ async def lifespan(app: FastAPI):
     """Startup: khởi tạo agent server."""
     async with server_session(
         assistant_id="harness-agent-prod",
-        model_name="claude-sonnet-4-6",
+        model_name="deepseek-v4-flash",
         sandbox_type="docker",
         host="127.0.0.1",
         port=2024,
@@ -246,7 +246,7 @@ services:
     ports:
       - "2024:2024"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - AGENT_ENV=production
       - LOG_LEVEL=INFO
     volumes:

@@ -2,6 +2,31 @@
 
 Phase 0.2 — Model Selection Decision Matrix
 See: AIDLC Lifecycle §0.2, docs/guides/plans/00-foundation.md §0.2
+
+All models use DeepSeek V4 family (released 2026-04-24).
+Provider: DeepSeek API (OpenAI-compatible endpoint).
+
+DeepSeek V4 Model Comparison:
+┌──────────────────────┬──────────────────────┬──────────────────────┐
+│                      │ deepseek-v4-flash    │ deepseek-v4-pro      │
+├──────────────────────┼──────────────────────┼──────────────────────┤
+│ Total params         │ 284B                 │ 1.6T                 │
+│ Active params        │ 13B                  │ 49B                  │
+│ Context window       │ 1M tokens            │ 1M tokens            │
+│ Max output           │ 384K tokens          │ 384K tokens          │
+│ Tool calling         │ ✅ Yes               │ ✅ Yes               │
+│ Structured output    │ ✅ Yes               │ ✅ Yes               │
+│ Thinking mode        │ Optional (off by     │ Default on           │
+│                      │ default)             │                      │
+│ Input (cache miss)   │ $0.14/1M             │ $0.435/1M            │
+│ Input (cache hit)    │ $0.0028/1M           │ $0.003625/1M         │
+│ Output               │ $0.28/1M             │ $0.87/1M             │
+│ Concurrency          │ 2500                 │ 500                  │
+└──────────────────────┴──────────────────────┴──────────────────────┘
+
+References:
+- https://api-docs.deepseek.com/quick_start/pricing
+- https://api-docs.deepseek.com/updates
 """
 
 from __future__ import annotations
@@ -16,8 +41,8 @@ class ModelConfig:
     """Configuration for a single model in the agent system.
 
     Attributes:
-        model_id: Fully-qualified model identifier (e.g. "claude-sonnet-4-6").
-        provider: "anthropic" | "openai" | "google".
+        model_id: Fully-qualified DeepSeek model ID (e.g. "deepseek-v4-pro").
+        provider: "deepseek" (all models share the same DeepSeek API).
         temperature: Sampling temperature (0.0 = deterministic).
         max_tokens: Maximum output tokens (None = provider default).
         purpose: Short description of this model's role.
@@ -35,62 +60,68 @@ class AgentModelSelection:
     """Complete model selection for the agent harness.
 
     Selection Rationale (per AIDLC §0.2 Decision Matrix):
-    ┌─────────────────────────┬─────────────────────┬────────────────────────────┐
-    │ Role                    │ Model               │ Rationale                  │
-    ├─────────────────────────┼─────────────────────┼────────────────────────────┤
-    │ Main orchestrator       │ claude-sonnet-4-6   │ Best tool-calling          │
-    │                         │                     │ reliability, subagent      │
-    │                         │                     │ delegation accuracy        │
-    ├─────────────────────────┼─────────────────────┼────────────────────────────┤
-    │ Subagents (heavy)       │ claude-sonnet-4-6   │ Complex reasoning,         │
-    │                         │                     │ code generation            │
-    ├─────────────────────────┼─────────────────────┼────────────────────────────┤
-    │ Subagents (light)       │ claude-haiku-4-5    │ Cost efficiency for        │
-    │                         │                     │ simple tasks               │
-    ├─────────────────────────┼─────────────────────┼────────────────────────────┤
-    │ Summarization           │ claude-haiku-4-5    │ Text summarization only;   │
-    │                         │                     │ fast, cheap (no OpenAI key) │
-    ├─────────────────────────┼─────────────────────┼────────────────────────────┤
-    │ Router / Classifier     │ claude-haiku-4-5    │ Fast structured output     │
-    └─────────────────────────┴─────────────────────┴────────────────────────────┘
+    ┌─────────────────────────┬──────────────────────┬───────────────────────────┐
+    │ Role                    │ Model                │ Rationale                 │
+    ├─────────────────────────┼──────────────────────┼───────────────────────────┤
+    │ Main orchestrator       │ deepseek-v4-flash    │ Fast tool calling,        │
+    │                         │                      │ low cost, high concurrency │
+    │                         │                      │ for routing & delegation  │
+    ├─────────────────────────┼──────────────────────┼───────────────────────────┤
+    │ Subagents (heavy)       │ deepseek-v4-pro      │ Strongest reasoning for   │
+    │                         │                      │ complex analysis, code    │
+    │                         │                      │ generation, architecture  │
+    ├─────────────────────────┼──────────────────────┼───────────────────────────┤
+    │ Subagents (light)       │ deepseek-v4-flash    │ Cost efficiency for       │
+    │                         │                      │ simple tasks, 2500 QPS    │
+    ├─────────────────────────┼──────────────────────┼───────────────────────────┤
+    │ Summarization           │ deepseek-v4-flash    │ 1M context, cheap output  │
+    │                         │                      │ for compressing long ctx  │
+    ├─────────────────────────┼──────────────────────┼───────────────────────────┤
+    │ Router / Classifier     │ deepseek-v4-flash    │ Fast structured output,   │
+    │                         │                      │ intent classification     │
+    └─────────────────────────┴──────────────────────┴───────────────────────────┘
 
-    Note: The original plan recommends gpt-5.4-mini for summarization,
-    but OPENAI_API_KEY is not available in this environment. We fall back
-    to claude-haiku-4-5 which is also fast, cheap, and already configured.
+    Why orchestrator uses v4-flash (not v4-pro):
+    - Orchestration is primarily a tool-calling task, not deep reasoning
+    - v4-flash is 3x cheaper and 5x higher concurrency than v4-pro
+    - Fast response matters for the agent's perceived performance
+    - v4-pro reserved for subagents doing truly complex work
+
+    Only one API key needed: DEEPSEEK_API_KEY
     """
 
     orchestrator: ModelConfig = field(default_factory=lambda: ModelConfig(
-        model_id="claude-sonnet-4-6",
-        provider="anthropic",
+        model_id="deepseek-v4-flash",
+        provider="deepseek",
         temperature=0.0,
         purpose="Main orchestrator — planning, routing, delegation decisions",
     ))
 
     subagent_heavy: ModelConfig = field(default_factory=lambda: ModelConfig(
-        model_id="claude-sonnet-4-6",
-        provider="anthropic",
+        model_id="deepseek-v4-pro",
+        provider="deepseek",
         temperature=0.0,
-        purpose="Heavy subagents — complex reasoning, code generation, research",
+        purpose="Heavy subagents — complex reasoning, code generation, architecture",
     ))
 
     subagent_light: ModelConfig = field(default_factory=lambda: ModelConfig(
-        model_id="claude-haiku-4-5",
-        provider="anthropic",
+        model_id="deepseek-v4-flash",
+        provider="deepseek",
         temperature=0.0,
         purpose="Light subagents — simple lookups, formatting, classification",
     ))
 
     summarization: ModelConfig = field(default_factory=lambda: ModelConfig(
-        model_id="claude-haiku-4-5",
-        provider="anthropic",
+        model_id="deepseek-v4-flash",
+        provider="deepseek",
         temperature=0.0,
         max_tokens=4096,
-        purpose="Summarization — compress long context; fast and cost-efficient",
+        purpose="Summarization — compress long context; 1M context window, cheap",
     ))
 
     router: ModelConfig = field(default_factory=lambda: ModelConfig(
-        model_id="claude-haiku-4-5",
-        provider="anthropic",
+        model_id="deepseek-v4-flash",
+        provider="deepseek",
         temperature=0.0,
         max_tokens=1024,
         purpose="Router / Classifier — structured output, intent classification",
@@ -113,19 +144,9 @@ class AgentModelSelection:
 
         providers_needed = {m.provider for m in self.all_models}
         for provider in providers_needed:
-            if (
-                provider == "anthropic"
-                and not os.environ.get("ANTHROPIC_API_KEY")
-            ):
+            if provider == "deepseek" and not os.environ.get("DEEPSEEK_API_KEY"):
                 warnings.append(
-                    "ANTHROPIC_API_KEY not set — Anthropic models unavailable"
-                )
-            elif (
-                provider == "openai"
-                and not os.environ.get("OPENAI_API_KEY")
-            ):
-                warnings.append(
-                    "OPENAI_API_KEY not set — OpenAI models unavailable"
+                    "DEEPSEEK_API_KEY not set — DeepSeek models unavailable"
                 )
 
         return warnings
@@ -133,14 +154,20 @@ class AgentModelSelection:
     def to_langchain_model(self, config: ModelConfig) -> Any:
         """Convert a ModelConfig to a LangChain BaseChatModel instance.
 
+        Uses ChatDeepSeek from langchain_deepseek package for native
+        DeepSeek API integration (OpenAI-compatible endpoint).
+
         Example:
             selection = AgentModelSelection()
             main_model = selection.to_langchain_model(selection.orchestrator)
         """
-        from langchain.chat_models import init_chat_model
+        from langchain_deepseek import ChatDeepSeek
 
-        return init_chat_model(
-            config.model_id,
-            temperature=config.temperature,
-            max_tokens=config.max_tokens,
-        )
+        kwargs: dict[str, Any] = {
+            "model": config.model_id,
+            "temperature": config.temperature,
+        }
+        if config.max_tokens is not None:
+            kwargs["max_tokens"] = config.max_tokens
+
+        return ChatDeepSeek(**kwargs)

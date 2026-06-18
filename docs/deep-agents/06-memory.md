@@ -95,7 +95,7 @@ AGENTS.md là file markdown chứa project-specific context và instructions cho
 
 ```python
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     memory=[
         "/memories/preferences.md",    # User preferences
         "/memories/user_info.md",      # User information
@@ -168,7 +168,7 @@ from langgraph.store.memory import InMemoryStore
 store = InMemoryStore()
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     store=store,
     backend=CompositeBackend(
         default=StateBackend(),
@@ -242,7 +242,7 @@ backend = CompositeBackend(
 )
 
 agent = create_deep_agent(
-    model="claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     backend=backend,
     memory=[
         "/memories/preferences.md",  # User-specific

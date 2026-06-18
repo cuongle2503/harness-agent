@@ -100,10 +100,10 @@ User Requirement          →  Deep Agents Capability          →  Implementati
 
 | Subagent | Responsibility | Tools Needed | Model |
 |----------|---------------|-------------|-------|
-| `researcher` | Web research, data synthesis | `search`, `fetch_url` | `claude-sonnet-4-6` |
-| `coder` | Code generation, execution | `read_file`, `execute_python` | `claude-sonnet-4-6` |
-| `reviewer` | Code review, quality check | `read_file`, `grep` | `claude-sonnet-4-6` |
-| `architect` | System design decisions | `read_file`, `search` | `claude-opus-4-8` |
+| `researcher` | Web research, data synthesis | `search`, `fetch_url` | `deepseek-v4-flash` |
+| `coder` | Code generation, execution | `read_file`, `execute_python` | `deepseek-v4-flash` |
+| `reviewer` | Code review, quality check | `read_file`, `grep` | `deepseek-v4-flash` |
+| `architect` | System design decisions | `read_file`, `search` | `deepseek-v4-pro` |
 
 **Tools hỗ trợ**:
 - **Agent `harness-architect`**: Thiết kế subagent topology

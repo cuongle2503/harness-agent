@@ -46,12 +46,12 @@ grep -r "BEGIN.*PRIVATE KEY" src/  # Không được có private keys
 ```python
 # ✅ GOOD: Secrets từ environment
 import os
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+DEEPSEEK_API_KEY = os.environ["DEEPSEEK_API_KEY"]
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # ✅ GOOD: Validate secrets at startup
 def validate_secrets() -> None:
-    required = ["ANTHROPIC_API_KEY"]
+    required = ["DEEPSEEK_API_KEY"]
     missing = [k for k in required if k not in os.environ]
     if missing:
         raise RuntimeError(f"Missing required secrets: {missing}")
@@ -388,7 +388,7 @@ permissions = [
 # Security Configuration
 
 ## Secrets
-- ANTHROPIC_API_KEY: Set via environment variable
+- DEEPSEEK_API_KEY: Set via environment variable
 - Rotation schedule: Every 90 days
 
 ## Sandbox

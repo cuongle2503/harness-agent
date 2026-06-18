@@ -36,7 +36,7 @@ Use `conftest.py` for shared fixtures. Each test should be independent.
 ```python
 @pytest.fixture
 def agent_config():
-    return AgentConfig(model="claude-sonnet-4-6", temperature=0.0)
+    return AgentConfig(model="deepseek-v4-flash", temperature=0.0)
 
 @pytest.fixture
 def mock_tool_registry():
