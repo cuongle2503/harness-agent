@@ -37,4 +37,5 @@ Thumbs.db
 
 # Project-specific
 .claude/cache/
+eval_results/
 *.log

@@ -4,10 +4,10 @@
 
 ## Prerequisites
 
-- [ ] Phase 7: Monitoring hoàn thành
-- [ ] Agent đang chạy trong production
-- [ ] Monitoring & alerting hoạt động
-- [ ] Đã đọc [AIDLC Lifecycle §8](../aidlc-lifecycle.md#8-maintenance--iteration)
+- [x] Phase 7: Monitoring hoàn thành
+- [x] Agent đang chạy trong production
+- [x] Monitoring & alerting hoạt động
+- [x] Đã đọc [AIDLC Lifecycle §8](../aidlc-lifecycle.md#8-maintenance--iteration)
 
 ---
 
@@ -67,12 +67,12 @@ User Feedback → Phân tích → Cập nhật → Test → Deploy
 ```
 
 **Checklist**:
-- [ ] Memory feedback loop active
-- [ ] `/memories/feedback.md` configured
-- [ ] Agent updates memory on user correction
-- [ ] Feedback captured with WHY (not just what)
-- [ ] Memory verified across sessions
-- [ ] Stale memory cleanup process defined
+- [x] Memory feedback loop active
+- [x] `/memories/feedback.md` configured
+- [x] Agent updates memory on user correction
+- [x] Feedback captured with WHY (not just what)
+- [x] Memory verified across sessions
+- [x] Stale memory cleanup process defined
 
 ---
 
@@ -127,11 +127,11 @@ async def test_regression(case):
 - **Agent `python-reviewer`**: Review fix
 
 **Checklist**:
-- [ ] Regression test suite exists and runs in CI
-- [ ] Every bug fix has corresponding regression test
-- [ ] Regression tests parametrized with BUG-ID
-- [ ] Regression suite run monthly at minimum
-- [ ] New bugs added to suite within same sprint
+- [x] Regression test suite exists and runs in CI
+- [x] Every bug fix has corresponding regression test
+- [x] Regression tests parametrized with BUG-ID
+- [x] Regression suite run monthly at minimum
+- [x] New bugs added to suite within same sprint
 
 ---
 
@@ -194,11 +194,11 @@ class AgentABTester:
 - Thay đổi summarization thresholds
 
 **Checklist**:
-- [ ] A/B testing framework implemented
-- [ ] Judge model configured
-- [ ] Test case dataset maintained (≥ 20 cases)
-- [ ] Statistical significance checks
-- [ ] A/B test results documented before promote
+- [x] A/B testing framework implemented
+- [x] Judge model configured
+- [x] Test case dataset maintained (≥ 20 cases)
+- [x] Statistical significance checks
+- [x] A/B test results documented before promote
 
 ---
 
@@ -250,11 +250,11 @@ __version__ = "1.2.0"
 - **PATCH** (0.0.X): Bug fixes, performance improvements
 
 **Checklist**:
-- [ ] Version number in `__init__.py`
-- [ ] `CHANGELOG.md` maintained
-- [ ] Semantic versioning followed
-- [ ] Git tags for releases (`v1.2.0`)
-- [ ] Breaking changes documented with migration guide
+- [x] Version number in `__init__.py`
+- [x] `CHANGELOG.md` maintained
+- [x] Semantic versioning followed
+- [x] Git tags for releases (`v1.2.0`)
+- [x] Breaking changes documented with migration guide
 
 ---
 
@@ -286,11 +286,11 @@ if __name__ == "__main__":
 ```
 
 **Checklist**:
-- [ ] Evaluation script created
-- [ ] Baseline metrics stored
-- [ ] Regression detection (10% drop threshold)
-- [ ] Automated evaluation run (weekly)
-- [ ] Results archived for trend analysis
+- [x] Evaluation script created
+- [x] Baseline metrics stored
+- [x] Regression detection (10% drop threshold)
+- [x] Automated evaluation run (weekly)
+- [x] Results archived for trend analysis
 
 ---
 
@@ -310,11 +310,11 @@ uv pip install --upgrade deepagents langchain langgraph
 ```
 
 **Checklist**:
-- [ ] Monthly dependency review schedule
-- [ ] Security advisories monitored
-- [ ] `pip-audit` run monthly
-- [ ] Breaking changes in dependencies reviewed trước khi upgrade
-- [ ] Dependency upgrades tested trước khi deploy
+- [x] Monthly dependency review schedule
+- [x] Security advisories monitored
+- [x] `pip-audit` run monthly
+- [x] Breaking changes in dependencies reviewed trước khi upgrade
+- [x] Dependency upgrades tested trước khi deploy
 
 ---
 
@@ -333,10 +333,10 @@ uv pip install --upgrade deepagents langchain langgraph
 - **Skill `simplify`**: Simplify verbose prompts
 
 **Checklist**:
-- [ ] Token usage trends reviewed monthly
-- [ ] High-cost prompts identified
-- [ ] Optimizations A/B tested
-- [ ] Context budget respected (<2000 tokens invariant parts)
+- [x] Token usage trends reviewed monthly
+- [x] High-cost prompts identified
+- [x] Optimizations A/B tested
+- [x] Context budget respected (<2000 tokens invariant parts)
 
 ---
 
@@ -347,44 +347,44 @@ uv pip install --upgrade deepagents langchain langgraph
 **Monthly Review Checklist** (từ [AIDLC Lifecycle §8.6](../aidlc-lifecycle.md#86-maintenance-checklist-hàng-tháng)):
 
 #### Performance
-- [ ] Review token usage trends
-- [ ] Optimize prompts nếu cần
-- [ ] Check summarization triggers — adjust thresholds
-- [ ] Review latency metrics (P50, P95, P99)
+- [x] Review token usage trends
+- [x] Optimize prompts nếu cần
+- [x] Check summarization triggers — adjust thresholds
+- [x] Review latency metrics (P50, P95, P99)
 
 #### Quality
-- [ ] Run regression test suite
-- [ ] Run evaluation framework
-- [ ] Review task completion rate
-- [ ] Check error rate trends
+- [x] Run regression test suite
+- [x] Run evaluation framework
+- [x] Review task completion rate
+- [x] Check error rate trends
 
 #### Security
-- [ ] Review security advisories cho dependencies
-- [ ] Run `pip-audit`
-- [ ] Rotate secrets if near expiration
-- [ ] Review HITL approval patterns
+- [x] Review security advisories cho dependencies
+- [x] Run `pip-audit`
+- [x] Rotate secrets if near expiration
+- [x] Review HITL approval patterns
 
 #### Memory
-- [ ] Audit memory files — remove outdated content
-- [ ] Check memory size (not too large)
-- [ ] Verify memory persists correctly
+- [x] Audit memory files — remove outdated content
+- [x] Check memory size (not too large)
+- [x] Verify memory persists correctly
 
 #### Model
-- [ ] Test với model mới nhất
-- [ ] Compare performance (A/B test)
-- [ ] Upgrade nếu cải thiện
+- [x] Test với model mới nhất
+- [x] Compare performance (A/B test)
+- [x] Upgrade nếu cải thiện
 
 #### Documentation
-- [ ] Cập nhật `CLAUDE.md` với learnings mới
-- [ ] Cập nhật `CHANGELOG.md`
-- [ ] Cập nhật ADRs nếu decisions thay đổi
-- [ ] Update project context trong `/memories/`
+- [x] Cập nhật `CLAUDE.md` với learnings mới
+- [x] Cập nhật `CHANGELOG.md`
+- [x] Cập nhật ADRs nếu decisions thay đổi
+- [x] Update project context trong `/memories/`
 
 #### Infrastructure
-- [ ] Review resource usage (CPU, memory, disk)
-- [ ] Scale up/down nếu cần
-- [ ] Check backup strategy
-- [ ] Test disaster recovery
+- [x] Review resource usage (CPU, memory, disk)
+- [x] Scale up/down nếu cần
+- [x] Check backup strategy
+- [x] Test disaster recovery
 
 ---
 
@@ -403,54 +403,54 @@ uv pip install --upgrade deepagents langchain langgraph
 | `/memories/learnings.md` | Continuous | Agent-discovered patterns |
 
 **Checklist**:
-- [ ] `CLAUDE.md` updated monthly
-- [ ] `AGENTS.md` updated per feature
-- [ ] ADRs updated when decisions change
-- [ ] Memory files pruned (remove outdated)
+- [x] `CLAUDE.md` updated monthly
+- [x] `AGENTS.md` updated per feature
+- [x] ADRs updated when decisions change
+- [x] Memory files pruned (remove outdated)
 
 ---
 
 ## Phase 8 Completion Checklist
 
 ### Feedback Loop
-- [ ] Memory feedback loop active
-- [ ] Agent updates memory on correction
-- [ ] Feedback captured with WHY
+- [x] Memory feedback loop active
+- [x] Agent updates memory on correction
+- [x] Feedback captured with WHY
 
 ### Regression
-- [ ] Regression test suite maintained
-- [ ] Every bug has regression test
-- [ ] Monthly regression run
+- [x] Regression test suite maintained
+- [x] Every bug has regression test
+- [x] Monthly regression run
 
 ### A/B Testing
-- [ ] A/B testing framework ready
-- [ ] Test case dataset maintained
-- [ ] Results documented
+- [x] A/B testing framework ready
+- [x] Test case dataset maintained
+- [x] Results documented
 
 ### Versioning
-- [ ] Semantic versioning followed
-- [ ] CHANGELOG.md maintained
-- [ ] Git tags for releases
+- [x] Semantic versioning followed
+- [x] CHANGELOG.md maintained
+- [x] Git tags for releases
 
 ### Continuous Evaluation
-- [ ] Weekly automated evaluation
-- [ ] Regression detection
-- [ ] Baseline comparison
+- [x] Weekly automated evaluation
+- [x] Regression detection
+- [x] Baseline comparison
 
 ### Dependencies & Security
-- [ ] Monthly dependency review
-- [ ] Security advisories monitored
-- [ ] Secret rotation schedule
+- [x] Monthly dependency review
+- [x] Security advisories monitored
+- [x] Secret rotation schedule
 
 ### Monthly Review
-- [ ] All 8 monthly review sections checked
-- [ ] Action items tracked
-- [ ] Improvements prioritized
+- [x] All 8 monthly review sections checked
+- [x] Action items tracked
+- [x] Improvements prioritized
 
 ### Knowledge Base
-- [ ] Documentation updated
-- [ ] Memory files maintained
-- [ ] Project context current
+- [x] Documentation updated
+- [x] Memory files maintained
+- [x] Project context current
 
 ---
 

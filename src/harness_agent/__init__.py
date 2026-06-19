@@ -17,6 +17,12 @@ from harness_agent.deployment import (  # noqa: E402, F401
     create_cli_agent,
     create_server_app,
 )
+from harness_agent.evaluation import (  # noqa: E402, F401
+    ABTestResult,
+    AgentABTester,
+    AgentEvaluator,
+    EvaluationResult,
+)
 from harness_agent.memory.hybrid_memory import HybridMemory, MemoryItem
 from harness_agent.monitoring import (  # noqa: E402, F401
     AgentMetrics,
@@ -44,9 +50,12 @@ from harness_agent.security import (  # noqa: E402, F401
 )
 from harness_agent.tools.registry import ToolRegistry
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
+    "ABTestResult",
+    "AgentABTester",
+    "AgentEvaluator",
     "AgentExecutionError",
     "AgentMetrics",
     "AgentOrchestrator",
@@ -57,6 +66,7 @@ __all__ = [
     "AlertRule",
     "AlertSeverity",
     "CLIAgent",
+    "EvaluationResult",
     "HITLApprovalDeniedError",
     "HarnessAgent",
     "HarnessError",
