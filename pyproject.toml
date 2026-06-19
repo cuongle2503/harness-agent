@@ -17,7 +17,12 @@ dependencies = [
     "langchain-deepseek>=1.0",
     "langchain-core>=0.3.0",
     "pydantic>=2.0",
+    "python-dotenv>=1.2.2",
 ]
+
+[project.scripts]
+harness = "harness_agent.deployment.cli:main"
+harness-server = "harness_agent.deployment.server:main"
 
 [project.optional-dependencies]
 dev = [
