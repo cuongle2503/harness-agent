@@ -147,6 +147,39 @@ def _flicker_flame() -> str:
 
 DEFAULT_MAX_TOOL_ITERATIONS = 50
 
+
+# ---------------------------------------------------------------------------
+# Chat input prompt
+# ---------------------------------------------------------------------------
+
+
+def _draw_chat_input() -> str:
+    """Draw a framed chat input box and return the user's input.
+
+    Looks like::
+
+          ╭─── 🔥 ─────────────────────────────────────
+          │  [user types here]
+          ╰────────────────────────────────────────────
+    """
+    w = _box_width()
+
+    # Top border: ╭─── 🔥 ─────── (flame icon embedded, open on right)
+    flame = Color.flame("🔥")
+    top_prefix = f"{_BOX_TOP}── {flame} "
+    top_prefix_vis = _visible_len(top_prefix)
+    h_fill = max(w - top_prefix_vis, 2)
+    print(f"\n  {top_prefix}{_BOX_H * h_fill}")
+
+    # Input on the framed line
+    result = input(f"  {_BOX_V}  ")
+
+    # Bottom border closes the box
+    print(f"  {_BOX_BOT}{_BOX_H * w}")
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # ANSI utility
 # ---------------------------------------------------------------------------
@@ -790,9 +823,7 @@ class CLIAgent:
 
         while True:
             try:
-                user_input = input(
-                    f"\n{Color.fire_prompt()}{Color.RESET}"
-                )
+                user_input = _draw_chat_input()
             except (EOFError, KeyboardInterrupt):
                 print("\nGoodbye!")
                 break
