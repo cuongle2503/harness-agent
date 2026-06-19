@@ -156,17 +156,18 @@ DEFAULT_MAX_TOOL_ITERATIONS = 50
 def _draw_chat_input() -> str:
     """Draw a fully framed chat input box and return the user's input.
 
-    The complete box is drawn before input starts so it looks finished
-    from the first moment. The cursor is positioned inside the box::
+    The top border is drawn first, then input is read, then the input line
+    is repainted with a right border (truncated if needed), and finally the
+    bottom border is drawn.  This ordering avoids alignment bugs when the
+    terminal wraps very long input text.
+
+    Looks like::
 
           ╭── 🔥 ─────────────────────────────────────╮
-          │  > user types here                        │
+          │  user types here                          │
           ╰───────────────────────────────────────────╯
-
-    Long input text is truncated visually so the right border never breaks.
     """
     w = _box_width()
-
     flame = Color.flame("🔥")
 
     # ── Top border ──
@@ -176,23 +177,24 @@ def _draw_chat_input() -> str:
     h_fill = max(w - top_prefix_vis - top_suffix_vis, 2)
     print(f"\n  {top_prefix}{_BOX_H * h_fill}{_BOX_TOP_R}")
 
-    # ── Pre-draw the empty middle line (both borders) ──
-    print(f"  {_BOX_V}{' ' * w}{_BOX_V}")
-
-    # ── Bottom border ──
-    print(f"  {_BOX_BOT}{_BOX_H * w}{_BOX_BOT_R}")
-
-    # ── Move cursor into the box for typing ──
-    sys.stdout.write("\033[2A")          # up 2 lines → middle line
-    sys.stdout.write(f"\r  {_BOX_V}  ")  # left border + padding
+    # ── Read input with cursor save/restore to survive terminal wrapping ──
+    # Display the left-border prompt, then save cursor before input() so
+    # we can jump back here afterwards — even if long text wrapped across
+    # many lines.
+    sys.stdout.write(f"  {_BOX_V}  ")
+    sys.stdout.flush()
+    sys.stdout.write("\0337")  # DECSC: save cursor (right after "│  ")
     sys.stdout.flush()
 
-    # ── Read input (cursor is inside the pre-drawn frame) ──
-    result = input()
+    result = input()  # no prompt arg — already displayed above
 
-    # ── Repaint middle line — text truncated to fit, right border locked ──
-    # Available space between left border + padding and right border
-    inner_w = w - 2  # 2 = "  " after the left border
+    sys.stdout.write("\0338")  # DECRC: restore cursor → back on input line
+    sys.stdout.flush()
+
+    # ── Redraw input line from saved position ──
+    # \033[J erases from cursor to end of screen (wipes any wrapped lines),
+    # then we redraw the one input line + bottom border cleanly.
+    inner_w = w - 2
     visible_input = _visible_len(result)
     if visible_input <= inner_w:
         display = result
@@ -202,12 +204,11 @@ def _draw_chat_input() -> str:
         pad = inner_w - _visible_len(display)
     if pad < 0:
         pad = 0
-    # \033[F = up one line (from below-middle back to middle)
-    # \n at end moves back down to bottom-border line; print() then clears it
-    sys.stdout.write(f"\033[F\r  {_BOX_V}  {display}{' ' * pad}{_BOX_V}\n")
+
+    sys.stdout.write(f"\033[J")  # erase from cursor to end of screen
+    sys.stdout.write(f"{display}{' ' * pad}{_BOX_V}\n")
+    sys.stdout.write(f"  {_BOX_BOT}{_BOX_H * w}{_BOX_BOT_R}\n")
     sys.stdout.flush()
-    # Move past the pre-drawn bottom border so agent output starts below the box
-    print()
 
     return result
 
