@@ -154,28 +154,38 @@ DEFAULT_MAX_TOOL_ITERATIONS = 50
 
 
 def _draw_chat_input() -> str:
-    """Draw a framed chat input box and return the user's input.
+    """Draw a fully framed chat input box and return the user's input.
 
     Looks like::
 
-          ╭─── 🔥 ─────────────────────────────────────
-          │  [user types here]
-          ╰────────────────────────────────────────────
+          ╭── 🔥 ─────────────────────────────────────╮
+          │  user types here                          │
+          ╰───────────────────────────────────────────╯
     """
     w = _box_width()
 
-    # Top border: ╭─── 🔥 ─────── (flame icon embedded, open on right)
     flame = Color.flame("🔥")
+
+    # Top border: ╭── 🔥 ──────────────────────────────╮
     top_prefix = f"{_BOX_TOP}── {flame} "
     top_prefix_vis = _visible_len(top_prefix)
-    h_fill = max(w - top_prefix_vis, 2)
-    print(f"\n  {top_prefix}{_BOX_H * h_fill}")
+    top_suffix = _BOX_TOP_R
+    top_suffix_vis = _visible_len(top_suffix)
+    h_fill = max(w - top_prefix_vis - top_suffix_vis, 2)
+    print(f"\n  {top_prefix}{_BOX_H * h_fill}{top_suffix}")
 
-    # Input on the framed line
+    # Input on the framed line (left border only during typing)
     result = input(f"  {_BOX_V}  ")
 
-    # Bottom border closes the box
-    print(f"  {_BOX_BOT}{_BOX_H * w}")
+    # Rewrite the input line with right border for a fully closed look.
+    # Cursor is now on the line below the input — move up and repaint.
+    visible_input = _visible_len(result)
+    pad = max(w - visible_input - 2, 1)  # 2 = two spaces after left border
+    sys.stdout.write(f"\033[F\r  {_BOX_V}  {result}{' ' * pad}{_BOX_V}\n")
+    sys.stdout.flush()
+
+    # Bottom border: ╰────────────────────────────────╯
+    print(f"  {_BOX_BOT}{_BOX_H * w}{_BOX_BOT_R}")
 
     return result
 
