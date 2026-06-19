@@ -84,6 +84,7 @@ class ServerConfig:
         shell_allow_list: Whitelist of allowed shell commands.
         enable_memory: Toggle cross-session memory.
         model_selection: Agent model selection.
+        max_tool_iterations: Max tool-calling loop iterations per turn.
     """
 
     assistant_id: str = "harness-agent-prod"
@@ -94,6 +95,7 @@ class ServerConfig:
     shell_allow_list: list[str] | None = None
     enable_memory: bool = True
     model_selection: AgentModelSelection | None = None
+    max_tool_iterations: int = 50
 
     def __post_init__(self) -> None:
         if self.shell_allow_list is None:
@@ -149,6 +151,7 @@ def create_server_app(
                 "You are a production coding assistant for the "
                 "Harness Agent project."
             ),
+            max_tool_iterations=cfg.max_tool_iterations,
         )
         _agent_pool[cfg.assistant_id] = agent
         logger.info(
@@ -246,3 +249,42 @@ def create_server_app(
         )
 
     return app
+
+
+def main() -> None:
+    """Entry point for the agent server.
+
+    Automatically loads .env and starts uvicorn.
+    Usage: python -m harness_agent.deployment.server
+    """
+    import os
+    from pathlib import Path
+
+    # Load .env
+    env_paths = [
+        Path.cwd() / ".env",
+        Path(__file__).resolve().parent.parent.parent.parent / ".env",
+    ]
+    for env_path in env_paths:
+        if env_path.exists():
+            from dotenv import load_dotenv
+
+            load_dotenv(env_path)
+            break
+
+    import uvicorn
+
+    host = os.environ.get("HARNESS_HOST", "127.0.0.1")
+    port = int(os.environ.get("HARNESS_PORT", "2024"))
+
+    uvicorn.run(
+        "harness_agent.deployment.server:create_server_app",
+        host=host,
+        port=port,
+        factory=True,
+        reload=False,
+    )
+
+
+if __name__ == "__main__":
+    main()
