@@ -17,6 +17,12 @@ from pydantic import BaseModel, Field
 
 from harness_agent.config import AgentModelSelection
 from harness_agent.core.agent import HarnessAgent
+from harness_agent.monitoring.dashboard import (
+    HealthDashboardResponse,
+    MetricsResponse,
+    build_dashboard_response,
+)
+from harness_agent.monitoring.metrics import AgentMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +108,7 @@ class ServerConfig:
 # ---------------------------------------------------------------------------
 
 _agent_pool: dict[str, HarnessAgent] = {}
+_agent_metrics: AgentMetrics = AgentMetrics()
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +134,9 @@ def create_server_app(
 
     # Extract to local so mypy can narrow the non-None type
     model_sel = cfg.model_selection
+
+    import time as _time_module
+    _server_start_time = _time_module.monotonic()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> Any:  # noqa: ARG001
@@ -210,6 +220,29 @@ def create_server_app(
             content=str(content),
             thread_id=request.thread_id or "default",
             tokens_used=int(tokens_used),
+        )
+
+    @app.get("/metrics", response_model=MetricsResponse)
+    async def get_metrics() -> MetricsResponse:
+        """Expose all agent observability metrics in JSON.
+
+        Returns all 9 key metrics plus percentile distributions.
+        """
+        data = _agent_metrics.to_dict()
+        return MetricsResponse(**data)
+
+    @app.get("/dashboard", response_model=HealthDashboardResponse)
+    async def get_dashboard() -> HealthDashboardResponse:
+        """Health dashboard with all 8 panels.
+
+        Panels: Agent Status, Request Rate, Error Rate, Latency,
+        Token Usage, Subagent Activity, HITL Status, Memory Usage.
+        """
+        uptime = _time_module.monotonic() - _server_start_time
+        return build_dashboard_response(
+            metrics=_agent_metrics,
+            uptime_seconds=uptime,
+            memory_item_count=len(_agent_pool),
         )
 
     return app

@@ -4,11 +4,11 @@
 
 ## Prerequisites
 
-- [ ] Phase 4: Testing hoàn thành
-- [ ] Tất cả tests passing
-- [ ] Code đã được implement
-- [ ] Đã đọc [AIDLC Lifecycle §5](../aidlc-lifecycle.md#5-security-hardening)
-- [ ] Đã đọc [Python Security Rules](../../../.claude/rules/python/security.md)
+- [x] Phase 4: Testing hoàn thành
+- [x] Tất cả tests passing
+- [x] Code đã được implement
+- [x] Đã đọc [AIDLC Lifecycle §5](../aidlc-lifecycle.md#5-security-hardening)
+- [x] Đã đọc [Python Security Rules](../../../.claude/rules/python/security.md)
 
 ---
 
@@ -69,14 +69,14 @@ def validate_secrets() -> None:
 - **Hook `PreToolUse`**: Bash safety warning
 
 **Checklist**:
-- [ ] `grep -r "sk-" src/ tests/` → NO RESULTS
-- [ ] `grep -r "api_key" src/ tests/` → Only `os.environ[...]` patterns
-- [ ] `grep -r "password" src/ tests/` → Only in test fixtures (fake)
-- [ ] `grep -r "BEGIN.*PRIVATE KEY" src/` → NO RESULTS
-- [ ] All secrets use `os.environ` or secret manager
-- [ ] `.env` files in `.gitignore`
-- [ ] Secrets validated at startup
-- [ ] No secrets in git history (check with `git log -p`)
+- [x] `grep -r "sk-" src/ tests/` → NO RESULTS
+- [x] `grep -r "api_key" src/ tests/` → Only `os.environ[...]` patterns
+- [x] `grep -r "password" src/ tests/` → Only in test fixtures (fake)
+- [x] `grep -r "BEGIN.*PRIVATE KEY" src/` → NO RESULTS
+- [x] All secrets use `os.environ` or secret manager
+- [x] `.env` files in `.gitignore`
+- [x] Secrets validated at startup
+- [x] No secrets in git history (check with `git log -p`)
 
 ---
 
@@ -134,13 +134,13 @@ class SearchInput(BaseModel):
 ```
 
 **Checklist**:
-- [ ] Tất cả tools có Pydantic input schema
-- [ ] Path traversal prevention trong file tools
-- [ ] Shell command allow list validation
-- [ ] Input sanitization (HTML, script, SQL)
-- [ ] Length limits trên tất cả string inputs
-- [ ] Range limits trên numeric inputs
-- [ ] `@field_validator` cho business logic validation
+- [x] Tất cả tools có Pydantic input schema
+- [x] Path traversal prevention trong file tools
+- [x] Shell command allow list validation
+- [x] Input sanitization (HTML, script, SQL)
+- [x] Length limits trên tất cả string inputs
+- [x] Range limits trên numeric inputs
+- [x] `@field_validator` cho business logic validation
 
 ---
 
@@ -164,12 +164,12 @@ subprocess.run(["cat", str(safe_path)], timeout=10)
 ```
 
 **Checklist**:
-- [ ] `grep -r "shell=True" src/` → NO RESULTS (trừ khi documented + safe)
-- [ ] `grep -r "pickle.load" src/` → NO RESULTS
-- [ ] `grep -r "eval(" src/` → NO RESULTS (trừ khi sandboxed)
-- [ ] `grep -r "exec(" src/` → NO RESULTS (trừ khi sandboxed)
-- [ ] Subprocess calls có timeout
-- [ ] Subprocess calls dùng list args
+- [x] `grep -r "shell=True" src/` → NO RESULTS (trừ khi documented + safe)
+- [x] `grep -r "pickle.load" src/` → NO RESULTS
+- [x] `grep -r "eval(" src/` → NO RESULTS (trừ khi sandboxed)
+- [x] `grep -r "exec(" src/` → NO RESULTS (trừ khi sandboxed)
+- [x] Subprocess calls có timeout
+- [x] Subprocess calls dùng list args
 
 ---
 
@@ -207,12 +207,12 @@ agent, backend = create_cli_agent(
 | **Demo/POC** | `"none"` | `True` | Trusted environment only |
 
 **Checklist**:
-- [ ] Sandbox type selected (`"docker"` cho production)
-- [ ] Shell allow list configured
-- [ ] File system permissions scoped
-- [ ] `interrupt_shell_only=True` cho production
-- [ ] `auto_approve=False` cho production
-- [ ] Sandbox tested với malicious commands
+- [x] Sandbox type selected (`"docker"` cho production)
+- [x] Shell allow list configured
+- [x] File system permissions scoped
+- [x] `interrupt_shell_only=True` cho production
+- [x] `auto_approve=False` cho production
+- [x] Sandbox tested với malicious commands
 
 ---
 
@@ -253,10 +253,10 @@ agent = create_deep_agent(
 | `glob`/`grep` | No approval | No approval |
 
 **Checklist**:
-- [ ] Dangerous tools identified
-- [ ] HITL configured cho production
-- [ ] `interrupt_on` dict configured
-- [ ] HITL flow tested
+- [x] Dangerous tools identified
+- [x] HITL configured cho production
+- [x] `interrupt_on` dict configured
+- [x] HITL flow tested
 
 ---
 
@@ -276,10 +276,10 @@ agent = create_deep_agent(
 ```
 
 **Checklist**:
-- [ ] `PIIMiddleware` enabled
-- [ ] PII detection patterns verified
-- [ ] Memory KHÔNG lưu PII
-- [ ] Logs KHÔNG chứa PII
+- [x] `PIIMiddleware` enabled
+- [x] PII detection patterns verified
+- [x] Memory KHÔNG lưu PII
+- [x] Logs KHÔNG chứa PII
 
 ---
 
@@ -310,11 +310,11 @@ permissions = [
 ```
 
 **Checklist**:
-- [ ] Permission boundaries defined
-- [ ] `.git/` directory protected
-- [ ] `.env` and secrets files protected
-- [ ] System directories (`/etc/`, `/proc/`) inaccessible
-- [ ] Permission config tested
+- [x] Permission boundaries defined
+- [x] `.git/` directory protected
+- [x] `.env` and secrets files protected
+- [x] System directories (`/etc/`, `/proc/`) inaccessible
+- [x] Permission config tested
 
 ---
 
@@ -335,46 +335,46 @@ permissions = [
 **Security Review Checklist** (từ [AIDLC Lifecycle §5.1](../aidlc-lifecycle.md#51-security-checklist)):
 
 #### Secrets Management
-- [ ] No hardcoded API keys/passwords/tokens
-- [ ] All secrets via `os.environ` or secret manager
-- [ ] Secrets validated at startup
-- [ ] `.env` in `.gitignore`
-- [ ] No secrets in git history
+- [x] No hardcoded API keys/passwords/tokens
+- [x] All secrets via `os.environ` or secret manager
+- [x] Secrets validated at startup
+- [x] `.env` in `.gitignore`
+- [x] No secrets in git history
 
 #### Input Validation
-- [ ] All tools have Pydantic input schema
-- [ ] Path traversal prevention
-- [ ] SQL injection prevention (parameterized queries)
-- [ ] Subprocess: list args, no shell string
-- [ ] Input sanitization (HTML, scripts, SQL)
+- [x] All tools have Pydantic input schema
+- [x] Path traversal prevention
+- [x] SQL injection prevention (parameterized queries)
+- [x] Subprocess: list args, no shell string
+- [x] Input sanitization (HTML, scripts, SQL)
 
 #### Sandbox
-- [ ] Production: Docker sandbox (`sandbox_type="docker"`)
-- [ ] Shell allow list configured
-- [ ] File system permissions limited
-- [ ] Sandbox tested
+- [x] Production: Docker sandbox (`sandbox_type="docker"`)
+- [x] Shell allow list configured
+- [x] File system permissions limited
+- [x] Sandbox tested
 
 #### HITL
-- [ ] Dangerous tools require approval
-- [ ] Production: `auto_approve=False`
-- [ ] HITL flow tested
+- [x] Dangerous tools require approval
+- [x] Production: `auto_approve=False`
+- [x] HITL flow tested
 
 #### PII
-- [ ] PIIMiddleware enabled
-- [ ] Memory does not store PII
-- [ ] Logs do not contain PII
+- [x] PIIMiddleware enabled
+- [x] Memory does not store PII
+- [x] Logs do not contain PII
 
 #### Code Safety
-- [ ] No `shell=True` in subprocess
-- [ ] No `pickle.load()` on untrusted data
-- [ ] No `eval()`/`exec()` outside sandbox
-- [ ] HTTP requests have timeouts
-- [ ] Error messages don't leak internals
+- [x] No `shell=True` in subprocess
+- [x] No `pickle.load()` on untrusted data
+- [x] No `eval()`/`exec()` outside sandbox
+- [x] HTTP requests have timeouts
+- [x] Error messages don't leak internals
 
 #### Dependencies
-- [ ] Dependencies up to date
-- [ ] Known vulnerabilities checked (`pip-audit` or similar)
-- [ ] Minimum version pins in requirements
+- [x] Dependencies up to date
+- [x] Known vulnerabilities checked (`pip-audit` or similar)
+- [x] Minimum version pins in requirements
 
 ---
 
@@ -407,43 +407,43 @@ permissions = [
 ```
 
 **Checklist**:
-- [ ] Security configuration documented
-- [ ] Secrets rotation schedule defined
-- [ ] Incident response plan outlined
-- [ ] Security contact identified
+- [x] Security configuration documented
+- [x] Secrets rotation schedule defined
+- [x] Incident response plan outlined
+- [x] Security contact identified
 
 ---
 
 ## Phase 5 Completion Checklist
 
 ### Secrets
-- [ ] No hardcoded secrets (verified with grep)
-- [ ] All secrets from environment
-- [ ] Startup validation
-- [ ] `.env` in `.gitignore`
+- [x] No hardcoded secrets (verified with grep)
+- [x] All secrets from environment
+- [x] Startup validation
+- [x] `.env` in `.gitignore`
 
 ### Input Validation
-- [ ] All tools validated
-- [ ] Path traversal prevented
-- [ ] Shell allow list
-- [ ] Input sanitization
+- [x] All tools validated
+- [x] Path traversal prevented
+- [x] Shell allow list
+- [x] Input sanitization
 
 ### Sandbox & HITL
-- [ ] Docker sandbox configured
-- [ ] Shell allow list
-- [ ] File permissions scoped
-- [ ] HITL enabled for dangerous tools
+- [x] Docker sandbox configured
+- [x] Shell allow list
+- [x] File permissions scoped
+- [x] HITL enabled for dangerous tools
 
 ### PII & Code Safety
-- [ ] PIIMiddleware enabled
-- [ ] No unsafe subprocess/serialization
-- [ ] Timeouts on external calls
+- [x] PIIMiddleware enabled
+- [x] No unsafe subprocess/serialization
+- [x] Timeouts on external calls
 
 ### Review
-- [ ] `security-reviewer` agent audit completed
-- [ ] All CRITICAL issues fixed
-- [ ] All HIGH issues fixed
-- [ ] Security documentation written
+- [x] `security-reviewer` agent audit completed
+- [x] All CRITICAL issues fixed
+- [x] All HIGH issues fixed
+- [x] Security documentation written
 
 ---
 

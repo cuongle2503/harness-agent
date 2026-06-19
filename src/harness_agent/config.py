@@ -151,6 +151,20 @@ class AgentModelSelection:
 
         return warnings
 
+    def validate_secrets(self) -> None:
+        """Validate that all required secrets are set at startup.
+
+        Raises:
+            RuntimeError: If any required secrets are missing.
+        """
+        required = ["DEEPSEEK_API_KEY"]
+        missing = [k for k in required if k not in os.environ]
+        if missing:
+            raise RuntimeError(
+                f"Missing required secrets: {missing}. "
+                f"Set them via environment variables before starting the agent."
+            )
+
     def to_langchain_model(self, config: ModelConfig) -> Any:
         """Convert a ModelConfig to a LangChain BaseChatModel instance.
 

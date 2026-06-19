@@ -68,6 +68,7 @@ class CLIAgent:
         self._llm = self._init_llm()
         self._sandbox = self._init_sandbox()
         self._agent = self._init_agent()
+        self._init_debug_mode()
 
     def _init_llm(self) -> BaseChatModel:
         """Initialize the language model from config."""
@@ -91,6 +92,12 @@ class CLIAgent:
         if self.config.sandbox_type == "none":
             return SandboxConfig.demo()
         return None
+
+    @staticmethod
+    def _init_debug_mode() -> None:
+        """Configure debug logging based on DEEPAGENTS_DEBUG env var."""
+        from harness_agent.monitoring.debug import configure_debug_mode
+        configure_debug_mode()
 
     def _init_agent(self) -> HarnessAgent:
         """Initialize the LangChain agent."""
