@@ -162,6 +162,8 @@ def _draw_chat_input() -> str:
           ╭── 🔥 ─────────────────────────────────────╮
           │  > user types here                        │
           ╰───────────────────────────────────────────╯
+
+    Long input text is truncated visually so the right border never breaks.
     """
     w = _box_width()
 
@@ -188,12 +190,24 @@ def _draw_chat_input() -> str:
     # ── Read input (cursor is inside the pre-drawn frame) ──
     result = input()
 
-    # ── Repaint middle line with typed text + right border ──
+    # ── Repaint middle line — text truncated to fit, right border locked ──
+    # Available space between left border + padding and right border
+    inner_w = w - 2  # 2 = "  " after the left border
     visible_input = _visible_len(result)
-    pad = max(w - visible_input - 2, 1)  # ensure right border stays in place
+    if visible_input <= inner_w:
+        display = result
+        pad = inner_w - visible_input
+    else:
+        display = _truncate_visible(result, inner_w - 3) + "..."
+        pad = inner_w - _visible_len(display)
+    if pad < 0:
+        pad = 0
     # \033[F = up one line (from below-middle back to middle)
-    sys.stdout.write(f"\033[F\r  {_BOX_V}  {result}{' ' * pad}{_BOX_V}\n")
+    # \n at end moves back down to bottom-border line; print() then clears it
+    sys.stdout.write(f"\033[F\r  {_BOX_V}  {display}{' ' * pad}{_BOX_V}\n")
     sys.stdout.flush()
+    # Move past the pre-drawn bottom border so agent output starts below the box
+    print()
 
     return result
 
