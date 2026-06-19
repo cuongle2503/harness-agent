@@ -13,6 +13,7 @@ import re as _re
 import shutil
 import sys
 import time
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -172,11 +173,12 @@ def _draw_chat_input() -> str:
     flame = Color.flame("🔥")
 
     # ── Top border ──
-    top_prefix = f"{_BOX_TOP}── {flame} "
-    top_prefix_vis = _visible_len(top_prefix)
-    top_suffix_vis = _visible_len(_BOX_TOP_R)
-    h_fill = max(w - top_prefix_vis - top_suffix_vis, 2)
-    print(f"\n  {top_prefix}{_BOX_H * h_fill}{_BOX_TOP_R}")
+    # Content between corners (╭...╮) must be exactly w columns.
+    # Separate the corner from the content so h_fill is measured correctly.
+    content_prefix = f"── {flame} "
+    content_w = _wcwidth(content_prefix)
+    h_fill = max(w - content_w, 0)
+    print(f"\n  {_BOX_TOP}{content_prefix}{_BOX_H * h_fill}{_BOX_TOP_R}")
 
     # ── Pre-draw empty middle + bottom (box looks complete immediately) ──
     print(f"  {_BOX_V}{' ' * w}{_BOX_V}")
@@ -199,13 +201,14 @@ def _draw_chat_input() -> str:
     sys.stdout.write("\033[J")  # erase cursor → end of screen
 
     inner_w = w - 2
-    visible_input = _visible_len(result)
-    if visible_input <= inner_w:
+    # Use _wcwidth for column-based alignment, _visible_len for truncation
+    cols_used = _wcwidth(result)
+    if cols_used <= inner_w:
         display = result
-        pad = inner_w - visible_input
+        pad = inner_w - cols_used
     else:
         display = _truncate_visible(result, inner_w - 3) + "..."
-        pad = inner_w - _visible_len(display)
+        pad = inner_w - _wcwidth(display)
     if pad < 0:
         pad = 0
 
@@ -228,6 +231,21 @@ def _visible_len(text: str) -> int:
     return len(_ANSI_RE.sub("", text))
 
 
+def _wcwidth(text: str) -> int:
+    """Return terminal column count, stripping ANSI codes and accounting for
+    wide characters (CJK ideographs, emoji, etc. that occupy 2 columns).
+
+    Use this for alignment math; use ``_visible_len`` for truncation logic
+    where character count matters.
+    """
+    clean = _ANSI_RE.sub("", text)
+    width = 0
+    for ch in clean:
+        w = unicodedata.east_asian_width(ch)
+        width += 2 if w in ("W", "F") else 1
+    return width
+
+
 
 # ---------------------------------------------------------------------------
 # Unicode box-drawing helpers
@@ -245,9 +263,9 @@ _BOX_MID_R = "┤"
 
 
 def _box_width() -> int:
-    """Get box content width based on terminal size (capped)."""
+    """Get box content width based on terminal size (capped at 72)."""
     tw = shutil.get_terminal_size().columns
-    return min(tw - 4, 88)
+    return min(tw - 4, 72)
 
 
 def _box_content(text: str, width: int, *, pad: int = 2) -> str:
@@ -258,11 +276,12 @@ def _box_content(text: str, width: int, *, pad: int = 2) -> str:
     are accounted for so the right border aligns correctly.
     """
     indent = " " * pad
-    max_text = width - pad - 1  # -1 for right margin inside border
+    max_text = width - pad  # preserve right margin inside border
     if _visible_len(text) > max_text:
         # Truncate by visible characters, preserving any ANSI prefix
         text = _truncate_visible(text, max_text - 3) + "..."
-    right_pad = width - _visible_len(text) - pad - 1
+    # Use _wcwidth for column-level alignment (handles emoji, CJK)
+    right_pad = width - _wcwidth(text) - pad
     if right_pad < 0:
         right_pad = 0
     return f"{_BOX_V}{indent}{text}{' ' * right_pad}{_BOX_V}"
@@ -320,7 +339,7 @@ def _fmt_tool_args(args: dict[str, Any], width: int) -> list[str]:
             s = s[:117] + "..."
         key_part = f"{Color.paint(k, Color.DIM)}: "
         line = key_part + s
-        # Truncate based on visible length
+        # Use _wcwidth for column alignment; _visible_len for truncation
         if _visible_len(line) > width - 4:
             max_val = width - 4 - _visible_len(key_part) - 3
             if max_val < 10:
@@ -340,8 +359,8 @@ def _draw_tool_box_top(tool_name: str, tool_args: dict[str, Any]) -> int:
 
     # Top border with tool name embedded (left-aligned after corner)
     title = f"✦ {tool_name} "
-    title_visible = _visible_len(title)
-    remaining = w - title_visible
+    title_w = _wcwidth(title)
+    remaining = w - title_w
     if remaining < 2:
         remaining = 2
     top = f"  {_BOX_TOP} {title}{_BOX_H * (remaining - 1)}"
@@ -508,12 +527,13 @@ async def _run_tool_with_spinner(
             # Build spinner line: │ ⠋ Running...                │
             prefix = f"  {_BOX_V}  {Color.paint(frame, Color.CYAN)} "
             suffix = f"{_BOX_V}"
-            prefix_visible = _visible_len(prefix)
-            suffix_visible = _visible_len(suffix)
+            prefix_visible = _wcwidth(prefix)
+            suffix_visible = _wcwidth(suffix)
             label = Color.paint("Running...", Color.DIM)
-            label_visible = _visible_len(label)
-            # Available space for right padding
-            right_pad = box_w - prefix_visible - label_visible - suffix_visible
+            label_visible = _wcwidth(label)
+            # Match the separator width: indent(2) + border(1) + content(box_w) + border(1)
+            total_w = box_w + 4
+            right_pad = total_w - prefix_visible - label_visible - suffix_visible
             if right_pad < 1:
                 right_pad = 1
             line = f"{prefix}{label}{' ' * right_pad}{suffix}"
@@ -957,8 +977,9 @@ class CLIAgent:
 
     def _cmd_help(self, args: str, history: list, key: str) -> str | None:
         """Show all available slash commands."""
+        w = _box_width()
         print(f"\n  {Color.tool('Slash Commands')}")
-        print(f"  {'─' * 50}")
+        print(f"  {Color.dim('─' * w)}")
         commands = [
             ("/help", "Show this help message"),
             ("/clear", "Reset conversation — start a fresh session"),
@@ -1053,14 +1074,52 @@ class CLIAgent:
     # ------------------------------------------------------------------
 
     def _print_welcome(self, history: list) -> None:
-        """Print welcome banner."""
-        print(f"\n{Color.BOLD}Harness Agent CLI — "
-              f"'{self.config.assistant_id}'{Color.RESET}")
-        print(f"Type {Color.tool('/help')} for commands, "
-              f"{Color.tool('/exit')} to quit")
-        print(f"Memory: {'enabled' if self.config.enable_memory else 'disabled'}")
+        """Print a framed welcome header."""
+        w = _box_width()
+        pad = 2
+
+        def _box_line(text: str = "", *, dim: bool = False) -> str:
+            """Render one line inside the header box."""
+            cols = _wcwidth(text)
+            right = w - cols - pad
+            right = max(right, 0)
+            style = Color.DIM if dim else ""
+            return f"  {_BOX_V}{' ' * pad}{text}{style}{' ' * right}{Color.RESET}{_BOX_V}"
+
+        # Top border
+        title = Color.paint("🔥  Harness Agent CLI", Color.BOLD)
+        # Content between corners (╭...╮) must equal w columns
+        content_prefix = f"── {title} "
+        content_w = _wcwidth(content_prefix)
+        h_fill = max(w - content_w, 0)
+        print(f"\n  {_BOX_TOP}{content_prefix}{Color.DIM}{_BOX_H * h_fill}{_BOX_TOP_R}{Color.RESET}")
+
+        # Content lines
+        sid = self.config.assistant_id
+        mem = "enabled" if self.config.enable_memory else "disabled"
+        tools_n = len(self._agent._tools)
+        hist_n = len(history)
+        model = (
+            getattr(self._llm, "model_name", None)
+            or getattr(self._llm, "model", "?")
+        )
+
+        print(_box_line(Color.paint(sid, Color.DIM)))
+        print(_box_line(""))
+        print(_box_line(
+            f"{Color.tool('/help')} for commands  ·  "
+            f"{Color.tool('/exit')} to quit"
+        ))
+        info = f"Memory: {mem}  ·  {tools_n} tools  ·  model: {model}"
+        print(_box_line(Color.muted(info), dim=True))
         if history:
-            print(f"Restored {len(history)} messages from previous session")
+            print(_box_line(
+                Color.muted(f"Restored {hist_n} messages from previous session"),
+                dim=True,
+            ))
+
+        # Bottom border
+        print(f"  {Color.dim(_BOX_BOT)}{Color.dim(_BOX_H * w)}{Color.dim(_BOX_BOT_R)}{Color.RESET}")
 
     def _print_context_bar(self, history: list) -> None:
         """Print a compact context bar before the prompt."""
@@ -1075,14 +1134,17 @@ class CLIAgent:
             f"{model_name}  ·  {tool_count} tools  ·  "
             f"{hist_count} msgs  ·  {mem_count} mem"
         )
+        # Adaptive separator width — match the box width
+        sep_w = _box_width() + 4  # +4 accounts for "  " indent + left/right borders
         print(Color.muted(info))
-        print(Color.dim("─" * 50))
+        print(Color.dim("─" * sep_w))
 
     @staticmethod
     def _print_help() -> None:
         """Print help message."""
+        w = _box_width()
         print(f"\n  {Color.tool('Slash Commands')}")
-        print(f"  {Color.dim('─' * 40)}")
+        print(f"  {Color.dim('─' * w)}")
         print(f"  {Color.tool('/help'):<20} Show this message")
         print(f"  {Color.tool('/clear'):<20} Reset session — start fresh")
         print(f"  {Color.tool('/context'):<20} Show session context & stats")
