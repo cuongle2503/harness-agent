@@ -1,21 +1,27 @@
 """Lightweight HTTP server for CLI agent metrics monitoring.
 
+Acts as a **session aggregator**: multiple CLI instances push metrics to a single
+server on one port. The dashboard shows all sessions with a dropdown selector.
+
 Runs in a daemon thread alongside the interactive CLI, serving
-/metrics, /dashboard, /health, and /ui endpoints. Uses only stdlib
+/metrics, /dashboard, /health, /ui, and push endpoints. Uses only stdlib
 so there are zero additional dependencies.
 
 Usage::
 
-    server = start_metrics_server(metrics, start_time, memory, port=2025)
-    # ... CLI runs ...
-    server.shutdown()  # or just exit process (daemon thread dies)
+    # Host mode (first CLI): starts the server
+    server, port = start_metrics_server(metrics, start_time, memory, port=2025)
+
+    # Client mode (subsequent CLIs): push via HTTP POST to existing server
 """
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import threading
+import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -39,97 +45,142 @@ def _load_static_html(filename: str) -> str:
 _DASHBOARD_HTML: str = _load_static_html("dashboard.html")
 _ACTIVITY_HTML: str = _load_static_html("activity.html")
 
-# Shared tool history (written by CLI agent, read by /tool-history endpoint)
-_tool_history: list[dict[str, Any]] = []
-_MAX_TOOL_HISTORY = 100
+# ---------------------------------------------------------------------------
+# Per-session storage — one aggregator serves many CLI instances
+# ---------------------------------------------------------------------------
 
-# Shared activity log (written by CLI agent, read by /activity endpoint)
-_activity_log: list[dict[str, Any]] = []
+_MAX_TOOL_HISTORY = 100
 _MAX_ACTIVITY = 200
 
-# Shared per-session metrics (written by CLI agent, read by /sessions endpoint)
-_session_metrics: dict[str, dict[str, Any]] = {}
+_sessions: dict[str, dict[str, Any]] = {}
+_sessions_lock = threading.Lock()
+
+
+def _get_or_create_session(session_id: str) -> dict[str, Any]:
+    """Get or create a session data bag (not thread-safe — caller must lock)."""
+    if session_id not in _sessions:
+        import time as _t0
+        _sessions[session_id] = {
+            "session_id": session_id,
+            "name": session_id,
+            "agent_id": session_id,
+            "pid": os.getpid(),
+            "started_at": _t0.time(),
+            "metrics": AgentMetrics(),
+            "tool_history": [],
+            "activity_log": [],
+            "session_metrics": {},
+            "memory": None,
+        }
+    return _sessions[session_id]
+
+
+# ---------------------------------------------------------------------------
+# Public recording API (host mode — called directly from CLI in same process)
+# ---------------------------------------------------------------------------
 
 
 def record_tool_history(
-    name: str, input_str: str, output_str: str,
-    latency_ms: float, success: bool = True,
+    name: str,
+    input_str: str,
+    output_str: str,
+    latency_ms: float,
+    success: bool = True,
+    *,
+    session_id: str = "default",
 ) -> None:
     """Record a tool call to the shared history (called by CLI agent)."""
     import time as _t
-    _tool_history.append({
-        "name": name,
-        "input": input_str[:200],
-        "output": output_str[:500],
-        "latency_ms": round(latency_ms, 2),
-        "success": success,
-        "timestamp": _t.time(),
-    })
-    if len(_tool_history) > _MAX_TOOL_HISTORY:
-        _tool_history.pop(0)
+    with _sessions_lock:
+        s = _get_or_create_session(session_id)
+        s["tool_history"].append({
+            "name": name,
+            "input": input_str[:200],
+            "output": output_str[:500],
+            "latency_ms": round(latency_ms, 2),
+            "success": success,
+            "timestamp": _t.time(),
+        })
+        if len(s["tool_history"]) > _MAX_TOOL_HISTORY:
+            s["tool_history"].pop(0)
 
 
 def record_activity(
     event_type: str,
+    *,
+    session_id: str = "default",
     **kwargs: Any,
 ) -> None:
-    """Record an activity event (called by CLI agent).
-
-    Args:
-        event_type: Event type label (user_msg, llm_start, tool_start,
-            tool_end, turn_end, system_prompt).
-        **kwargs: Arbitrary event data merged into the record.
-    """
+    """Record an activity event (called by CLI agent)."""
     import time as _tt
-    entry: dict[str, Any] = {"type": event_type, "time": _tt.monotonic()}
-    entry.update(kwargs)
-    _activity_log.append(entry)
-    if len(_activity_log) > _MAX_ACTIVITY:
-        _activity_log.pop(0)
+    with _sessions_lock:
+        s = _get_or_create_session(session_id)
+        entry: dict[str, Any] = {"type": event_type, "time": _tt.monotonic()}
+        entry.update(kwargs)
+        s["activity_log"].append(entry)
+        if len(s["activity_log"]) > _MAX_ACTIVITY:
+            s["activity_log"].pop(0)
 
 
 def record_session(
     thread_id: str,
+    *,
+    session_id: str = "default",
     **kwargs: Any,
 ) -> None:
-    """Upsert per-session metrics (called by CLI agent).
-
-    Args:
-        thread_id: Session thread identifier.
-        **kwargs: Metrics to merge into the session record
-            (e.g. input_tokens, output_tokens, api_calls, tool_calls, turns).
-    """
+    """Upsert per-thread metrics within a CLI session."""
     import time as _ttt
-    sess = _session_metrics.get(thread_id)
-    if sess is None:
-        sess = {
-            "thread_id": thread_id,
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "api_calls": 0,
-            "tool_calls": 0,
-            "turns": 0,
-            "created_at": _ttt.time(),
-        }
-        _session_metrics[thread_id] = sess
-    for key, value in kwargs.items():
-        if key in ("input_tokens", "output_tokens", "api_calls", "tool_calls", "turns"):
-            sess[key] = sess.get(key, 0) + int(value)
-        else:
-            sess[key] = value
-    sess["last_active"] = _ttt.monotonic()
+    with _sessions_lock:
+        s = _get_or_create_session(session_id)
+        sm = s["session_metrics"]
+        sess = sm.get(thread_id)
+        if sess is None:
+            sess = {
+                "thread_id": thread_id,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "api_calls": 0,
+                "tool_calls": 0,
+                "turns": 0,
+                "created_at": _ttt.time(),
+            }
+            sm[thread_id] = sess
+        for key, value in kwargs.items():
+            if key in ("input_tokens", "output_tokens", "api_calls", "tool_calls", "turns"):
+                sess[key] = sess.get(key, 0) + int(value)
+            else:
+                sess[key] = value
+        sess["last_active"] = _ttt.monotonic()
+
+
+def register_session(session_id: str, name: str, agent_id: str) -> None:
+    """Register a CLI session (called via POST /register or host init)."""
+    with _sessions_lock:
+        s = _get_or_create_session(session_id)
+        s["name"] = name or agent_id
+        s["agent_id"] = agent_id
+        s["pid"] = os.getpid()
+
+
+def unregister_session(session_id: str) -> None:
+    """Remove a CLI session (called via POST /unregister or atexit)."""
+    with _sessions_lock:
+        _sessions.pop(session_id, None)
+
+
+def get_session_ids() -> list[str]:
+    """Return sorted list of active session IDs."""
+    with _sessions_lock:
+        return sorted(_sessions.keys())
+
+
+# ---------------------------------------------------------------------------
+# HTTP Request Handler
+# ---------------------------------------------------------------------------
 
 
 class _MetricsHandler(BaseHTTPRequestHandler):
-    """HTTP request handler that serves metrics JSON and dashboard UI.
-
-    Injected class attributes (set by ``start_metrics_server``):
-        metrics: AgentMetrics
-        start_time: float
-        memory: HybridMemory | None
-        agent_id: str
-        sandbox_type: str
-    """
+    """HTTP request handler — serves GET (dashboard) and POST (client push)."""
 
     # Injected by factory
     metrics: AgentMetrics
@@ -137,13 +188,16 @@ class _MetricsHandler(BaseHTTPRequestHandler):
     memory: HybridMemory | None
     agent_id: str
     sandbox_type: str
+    session_id: str = "default"
 
-    # Suppress per-request log lines
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
         pass
 
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
     def _send_json(self, data: Any, status: int = 200) -> None:
-        """Send a JSON response."""
         body = json.dumps(data, default=str).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -153,7 +207,6 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _send_html(self, html: str, status: int = 200) -> None:
-        """Send an HTML response."""
         body = html.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -161,19 +214,43 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _read_body(self) -> dict[str, Any]:
+        length = int(self.headers.get("Content-Length", 0))
+        if length == 0:
+            return {}
+        raw = self.rfile.read(length)
+        return json.loads(raw.decode("utf-8"))
+
+    def _query_param(self, key: str, default: str = "") -> str:
+        try:
+            from urllib.parse import parse_qs, urlparse
+            qs = parse_qs(urlparse(self.path).query)
+            return qs.get(key, [default])[0]
+        except Exception:
+            return default
+
+    def _resolve_session_id(self) -> str:
+        """Resolve session_id from query param, falling back to first available."""
+        sid = self._query_param("session_id")
+        if sid:
+            return sid
+        ids = get_session_ids()
+        return ids[0] if ids else "default"
+
     def _uptime(self) -> float:
-        """Return uptime in seconds."""
         import time as _time
         return _time.monotonic() - self.start_time
+
+    def _get_session(self, session_id: str) -> dict[str, Any]:
+        with _sessions_lock:
+            return _sessions.get(session_id, {})
 
     # ------------------------------------------------------------------
     # Route dispatch
     # ------------------------------------------------------------------
 
     def do_GET(self) -> None:
-        """Route GET requests."""
         from urllib.parse import urlparse
-
         path = urlparse(self.path).path.rstrip("/") or "/"
 
         routes: dict[str, Any] = {
@@ -183,6 +260,7 @@ class _MetricsHandler(BaseHTTPRequestHandler):
             "/tool-history": self._handle_tool_history,
             "/activity": self._handle_activity,
             "/sessions": self._handle_sessions,
+            "/registry": self._handle_registry,
             "/ui": self._handle_ui,
             "/ui/activity": self._handle_ui_activity,
             "/": self._handle_root,
@@ -194,16 +272,34 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         else:
             self._send_json({"error": "not found", "path": path}, status=404)
 
+    def do_POST(self) -> None:
+        from urllib.parse import urlparse
+        path = urlparse(self.path).path.rstrip("/") or "/"
+
+        post_routes: dict[str, Any] = {
+            "/register": self._handle_post_register,
+            "/unregister": self._handle_post_unregister,
+            "/push/tool-history": self._handle_post_tool_history,
+            "/push/activity": self._handle_post_activity,
+            "/push/session": self._handle_post_session,
+            "/push/metrics": self._handle_post_metrics,
+        }
+
+        handler = post_routes.get(path)
+        if handler:
+            handler()
+        else:
+            self._send_json({"error": "not found", "path": path}, status=404)
+
     def do_OPTIONS(self) -> None:
-        """Handle CORS preflight."""
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
     # ------------------------------------------------------------------
-    # Endpoint handlers
+    # GET handlers (all support ?session_id= filter)
     # ------------------------------------------------------------------
 
     def _handle_health(self) -> None:
@@ -214,18 +310,75 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         })
 
     def _handle_metrics(self) -> None:
-        data = self.metrics.to_dict()
+        sid = self._resolve_session_id()
+        s = self._get_session(sid)
+        metrics = s.get("metrics") if s else None
+        data = metrics.to_dict() if metrics else {}
         self._send_json(data)
 
     def _handle_dashboard(self) -> None:
+        sid = self._resolve_session_id()
+        s = self._get_session(sid)
+        metrics = s.get("metrics") if s else None
+        if metrics is None:
+            self._send_json({"error": "session not found"}, status=404)
+            return
         uptime = self._uptime()
         memory_count = len(self.memory) if self.memory else 0
         response = build_dashboard_response(
-            metrics=self.metrics,
+            metrics=metrics,
             uptime_seconds=uptime,
             memory_item_count=memory_count,
         )
         self._send_json(response.model_dump())
+
+    def _handle_tool_history(self) -> None:
+        sid = self._resolve_session_id()
+        s = self._get_session(sid)
+        history = s.get("tool_history", []) if s else []
+        count = 20
+        try:
+            count = int(self._query_param("count", "20"))
+        except ValueError:
+            pass
+        self._send_json(history[-count:])
+
+    def _handle_activity(self) -> None:
+        sid = self._resolve_session_id()
+        s = self._get_session(sid)
+        log = s.get("activity_log", []) if s else []
+        count = 50
+        try:
+            count = int(self._query_param("count", "50"))
+        except ValueError:
+            pass
+        self._send_json(log[-count:])
+
+    def _handle_sessions(self) -> None:
+        sid = self._resolve_session_id()
+        s = self._get_session(sid)
+        sm = s.get("session_metrics", {}) if s else {}
+        self._send_json(
+            sorted(
+                sm.values(),
+                key=lambda x: x.get("last_active", 0),
+                reverse=True,
+            )
+        )
+
+    def _handle_registry(self) -> None:
+        """Return all active CLI sessions."""
+        result = []
+        with _sessions_lock:
+            for sid, s in _sessions.items():
+                result.append({
+                    "session_id": sid,
+                    "name": s.get("name", sid),
+                    "agent_id": s.get("agent_id", ""),
+                    "pid": s.get("pid", 0),
+                    "started_at": s.get("started_at", 0),
+                })
+        self._send_json(result)
 
     def _handle_ui(self) -> None:
         self._send_html(_DASHBOARD_HTML)
@@ -233,42 +386,84 @@ class _MetricsHandler(BaseHTTPRequestHandler):
     def _handle_ui_activity(self) -> None:
         self._send_html(_ACTIVITY_HTML)
 
-    def _handle_tool_history(self) -> None:
-        """Return recent tool calls with details."""
-        count = 20
-        try:
-            from urllib.parse import parse_qs, urlparse
-            qs = parse_qs(urlparse(self.path).query)
-            count = int(qs.get("count", [20])[0])
-        except Exception:
-            pass
-        self._send_json(_tool_history[-count:])
-
-    def _handle_activity(self) -> None:
-        """Return recent activity events for the real-time trace page."""
-        count = 50
-        try:
-            from urllib.parse import parse_qs, urlparse
-            qs = parse_qs(urlparse(self.path).query)
-            count = int(qs.get("count", [50])[0])
-        except Exception:
-            pass
-        self._send_json(_activity_log[-count:])
-
-    def _handle_sessions(self) -> None:
-        """Return per-session (per-thread) metrics."""
-        self._send_json(
-            sorted(
-                _session_metrics.values(),
-                key=lambda s: s.get("last_active", 0),
-                reverse=True,
-            )
-        )
-
     def _handle_root(self) -> None:
         self.send_response(302)
         self.send_header("Location", "/ui")
         self.end_headers()
+
+    # ------------------------------------------------------------------
+    # POST handlers — client CLI pushes data to aggregator
+    # ------------------------------------------------------------------
+
+    def _handle_post_register(self) -> None:
+        body = self._read_body()
+        sid = body.get("session_id") or uuid.uuid4().hex[:8]
+        name = body.get("name", sid)
+        agent_id = body.get("agent_id", sid)
+        register_session(sid, name, agent_id)
+        self._send_json({"session_id": sid, "status": "registered"})
+
+    def _handle_post_unregister(self) -> None:
+        body = self._read_body()
+        sid = body.get("session_id", "")
+        unregister_session(sid)
+        self._send_json({"status": "unregistered"})
+
+    def _handle_post_tool_history(self) -> None:
+        body = self._read_body()
+        sid = body.get("session_id", "default")
+        record_tool_history(
+            name=body.get("name", "?"),
+            input_str=body.get("input_str", ""),
+            output_str=body.get("output_str", ""),
+            latency_ms=body.get("latency_ms", 0),
+            success=body.get("success", True),
+            session_id=sid,
+        )
+        with _sessions_lock:
+            s = _get_or_create_session(sid)
+            metrics = s["metrics"]
+        metrics.record_tool_call(
+            body.get("name", "?"),
+            body.get("latency_ms", 0),
+            success=body.get("success", True),
+        )
+        self._send_json({"status": "ok"})
+
+    def _handle_post_activity(self) -> None:
+        body = self._read_body()
+        sid = body.pop("session_id", "default")
+        event_type = body.pop("event_type", "unknown")
+        record_activity(event_type, session_id=sid, **body)
+        self._send_json({"status": "ok"})
+
+    def _handle_post_session(self) -> None:
+        body = self._read_body()
+        sid = body.pop("session_id", "default")
+        thread_id = body.pop("thread_id", "")
+        record_session(thread_id, session_id=sid, **body)
+        self._send_json({"status": "ok"})
+
+    def _handle_post_metrics(self) -> None:
+        body = self._read_body()
+        sid = body.get("session_id", "default")
+        with _sessions_lock:
+            s = _get_or_create_session(sid)
+            metrics_data = body.get("metrics", {})
+            m = s["metrics"]
+            # Merge numeric fields from pushed metrics
+            for field in ("model_calls", "model_errors", "total_tokens",
+                          "input_tokens", "output_tokens", "tool_calls",
+                          "tool_errors", "total_tasks", "completed_tasks"):
+                val = metrics_data.get(field, 0)
+                if val:
+                    setattr(m, field, getattr(m, field, 0) + int(val))
+        self._send_json({"status": "ok"})
+
+
+# ---------------------------------------------------------------------------
+# Server factory
+# ---------------------------------------------------------------------------
 
 
 def start_metrics_server(
@@ -279,26 +474,41 @@ def start_metrics_server(
     port: int = 2025,
     agent_id: str = "harness-agent-cli",
     sandbox_type: str = "docker",
-) -> HTTPServer:
-    """Start a background metrics HTTP server for the CLI agent.
+    session_name: str = "",
+) -> tuple[HTTPServer, int]:
+    """Start a background metrics HTTP aggregator server.
 
     Args:
-        metrics: Shared AgentMetrics instance (the CLI records to it).
+        metrics: Shared AgentMetrics instance (host CLI records to it).
         start_time: ``time.monotonic()`` value from CLI startup.
         memory: Optional HybridMemory for the memory panel.
         port: TCP port to listen on (default 2025).
         agent_id: Agent identifier for health checks.
         sandbox_type: Sandbox type for health checks.
+        session_name: Human-readable label for the UI session selector.
 
     Returns:
-        The running HTTPServer instance (call ``shutdown()`` to stop).
+        Tuple of (running HTTPServer, actual_port_bound).
+
+    Raises:
+        OSError: If the port cannot be bound.
     """
+    name = session_name or os.environ.get("HARNESS_SESSION_NAME", "")
+    sid = name or agent_id
+
     # Inject state into the handler class
     _MetricsHandler.metrics = metrics
     _MetricsHandler.start_time = start_time
     _MetricsHandler.memory = memory
     _MetricsHandler.agent_id = agent_id
     _MetricsHandler.sandbox_type = sandbox_type
+    _MetricsHandler.session_id = sid
+
+    # Register this host session and use the caller's metrics instance
+    register_session(sid, name, agent_id)
+    with _sessions_lock:
+        _sessions[sid]["metrics"] = metrics
+    atexit.register(unregister_session, sid)
 
     host = os.environ.get("HARNESS_MONITORING_HOST", "127.0.0.1")
     server = HTTPServer((host, port), _MetricsHandler)
@@ -310,4 +520,4 @@ def start_metrics_server(
     )
     thread.start()
 
-    return server
+    return server, port

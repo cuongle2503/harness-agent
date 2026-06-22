@@ -40,6 +40,63 @@ from harness_agent.prompts import load_prompt
 from harness_agent.security.sandbox import SandboxConfig
 
 # ---------------------------------------------------------------------------
+# Metrics bridge — host mode (direct) vs client mode (HTTP POST)
+# ---------------------------------------------------------------------------
+
+
+class _MetricsBridge:
+    """Routes metric recordings to either direct function calls (host mode)
+    or HTTP POST to the aggregator (client mode)."""
+
+    def __init__(
+        self, session_id: str, *, http_port: int | None = None
+    ) -> None:
+        self.sid = session_id
+        self._port = http_port
+        self._url = f"http://127.0.0.1:{http_port}" if http_port else ""
+
+    @property
+    def is_host(self) -> bool:
+        return self._port is None
+
+    def tool_history(self, **kw: Any) -> None:
+        if self._port:
+            self._post("/push/tool-history", kw)
+        else:
+            record_tool_history(session_id=self.sid, **kw)
+
+    def activity(self, event_type: str, **kw: Any) -> None:
+        if self._port:
+            self._post("/push/activity", {"event_type": event_type, **kw})
+        else:
+            record_activity(event_type, session_id=self.sid, **kw)
+
+    def session(self, thread_id: str, **kw: Any) -> None:
+        if self._port:
+            self._post("/push/session", {"thread_id": thread_id, **kw})
+        else:
+            record_session(thread_id, session_id=self.sid, **kw)
+
+    def push_metrics(self) -> None:
+        """Push current metrics snapshot (client mode only)."""
+        if not self._port:
+            return
+
+    def _post(self, path: str, data: dict[str, Any]) -> None:
+        """Fire-and-forget HTTP POST to aggregator."""
+        import urllib.request
+        body = json.dumps({**data, "session_id": self.sid}).encode("utf-8")
+        try:
+            req = urllib.request.Request(
+                self._url + path,
+                data=body,
+                headers={"Content-Type": "application/json"},
+            )
+            urllib.request.urlopen(req, timeout=2)
+        except Exception:
+            pass  # best-effort: don't block the CLI on metrics push
+
+# ---------------------------------------------------------------------------
 # Terminal colors (ANSI)
 # ---------------------------------------------------------------------------
 
@@ -603,6 +660,7 @@ class CLIAgentConfig:
     """
 
     assistant_id: str = "harness-agent-cli"
+    session_name: str = ""  # Human-readable label for UI session selector
     system_prompt: str = ""  # Empty = load default from prompts/main_agent.md
     shell_allow_list: list[str] = field(default_factory=lambda: [
         "ls", "cat", "grep", "find",
@@ -638,7 +696,9 @@ class CLIAgent:
         self._memory = HybridMemory()
         self._metrics = AgentMetrics()
         self._start_time = time.monotonic()
-        self._metrics_server = self._start_metrics_http_server()
+        self._session_id = ""
+        self._bridge: _MetricsBridge | None = None
+        self._metrics_server = self._connect_metrics_aggregator()
         self._init_debug_mode()
 
     def _init_llm(self) -> BaseChatModel:
@@ -683,12 +743,17 @@ class CLIAgent:
             max_tool_iterations=self.config.max_tool_iterations,
         )
 
-    def _start_metrics_http_server(self) -> Any:
-        """Start a background HTTP server for the monitoring dashboard.
+    def _connect_metrics_aggregator(self) -> Any:
+        """Connect to the metrics aggregator (host or client mode).
 
-        Uses stdlib http.server in a daemon thread — no extra dependencies.
-        The dashboard polls this server for live metrics while the CLI runs.
+        HOST MODE (first CLI): starts the aggregator server on the configured
+        port and records metrics via direct function calls.
+
+        CLIENT MODE (subsequent CLIs): the port is already bound → registers
+        with the existing aggregator via HTTP POST and pushes metrics via HTTP.
         """
+        import urllib.request as _ur
+
         from harness_agent.deployment.cli_metrics_server import (
             start_metrics_server,
         )
@@ -701,21 +766,90 @@ class CLIAgent:
             except ValueError:
                 pass
 
+        name = self.config.session_name or os.environ.get(
+            "HARNESS_SESSION_NAME", ""
+        )
+        session_id = name or self.config.assistant_id
+
+        # Check if an aggregator is already running on this port
+        aggregator_alive = False
         try:
-            return start_metrics_server(
-                metrics=self._metrics,
-                start_time=self._start_time,
-                memory=self._memory,
-                port=port,
-                agent_id=self.config.assistant_id,
-                sandbox_type=self.config.sandbox_type,
+            _ur.urlopen(f"http://127.0.0.1:{port}/health", timeout=1)
+            aggregator_alive = True
+        except Exception:
+            pass
+
+        if aggregator_alive:
+            # --- CLIENT MODE ---
+            self._session_id = session_id
+            self._bridge = _MetricsBridge(session_id, http_port=port)
+            # Register with the existing aggregator
+            try:
+                body = json.dumps({
+                    "session_id": session_id,
+                    "name": name,
+                    "agent_id": self.config.assistant_id,
+                }).encode("utf-8")
+                req = _ur.Request(
+                    f"http://127.0.0.1:{port}/register",
+                    data=body,
+                    headers={"Content-Type": "application/json"},
+                )
+                _ur.urlopen(req, timeout=2)
+                print(f"\n  {Color.success('📊 Dashboard:')} "
+                      f"{Color.paint(f'http://127.0.0.1:{port}/ui', Color.CYAN)}")
+                msg = f'connected to existing aggregator as "{session_id}"'
+                print(f"  {Color.dim(msg)}")
+                # Register cleanup on exit
+                import atexit as _ae
+                _ae.register(self._unregister_from_aggregator)
+                return None  # no server to manage
+            except Exception as e:
+                print(f"\n  {Color.warn(f'⚠ Failed to register with aggregator: {e}')}")
+                print(f"  {Color.dim('Metrics and UI unavailable this session.')}")
+                self._bridge = None
+                return None
+        else:
+            # --- HOST MODE ---
+            try:
+                server, actual_port = start_metrics_server(
+                    metrics=self._metrics,
+                    start_time=self._start_time,
+                    memory=self._memory,
+                    port=port,
+                    agent_id=self.config.assistant_id,
+                    sandbox_type=self.config.sandbox_type,
+                    session_name=name,
+                )
+                self._session_id = session_id
+                self._bridge = _MetricsBridge(session_id)  # host mode
+                url = f"http://127.0.0.1:{actual_port}/ui"
+                print(f"\n  {Color.success('📊 Dashboard:')} "
+                      f"{Color.paint(url, Color.CYAN)}")
+                msg2 = f'aggregator started, session: "{session_id}"'
+                print(f"  {Color.dim(msg2)}")
+                return server
+            except OSError as e:
+                print(f"\n  {Color.warn(f'⚠ Dashboard server: {e}')}")
+                print(f"  {Color.dim('Metrics and UI unavailable this session.')}")
+                return None
+
+    def _unregister_from_aggregator(self) -> None:
+        """Notify aggregator that this session is gone (client mode)."""
+        import urllib.request as _ur
+        port = self.config.monitoring_port
+        try:
+            body = json.dumps(
+                {"session_id": self._session_id}
+            ).encode("utf-8")
+            req = _ur.Request(
+                f"http://127.0.0.1:{port}/unregister",
+                data=body,
+                headers={"Content-Type": "application/json"},
             )
-        except OSError as e:
-            # Port in use or permission denied — warn and continue
-            print(f"\n  {Color.warn(f'⚠ Dashboard server: {e}')}")
-            print(f"  {Color.dim('Metrics and UI unavailable this session.')}")
-            print(f"  {Color.dim('Set HARNESS_MONITORING_PORT to change port.')}")
-            return None
+            _ur.urlopen(req, timeout=2)
+        except Exception:
+            pass
 
     async def _stream_turn(
         self, messages: list, config: RunnableConfig
@@ -850,12 +984,13 @@ class CLIAgent:
             # Update session metrics with token/API call counts
             if total_tokens or input_tokens or output_tokens:
                 tid = config.get("configurable", {}).get("thread_id", "default")
-                record_session(
-                    tid,
-                    input_tokens=int(input_tokens),
-                    output_tokens=int(output_tokens),
-                    api_calls=1,
-                )
+                if self._bridge:
+                    self._bridge.session(
+                        tid,
+                        input_tokens=int(input_tokens),
+                        output_tokens=int(output_tokens),
+                        api_calls=1,
+                    )
 
             content = _extract_chunk_text(accumulated)
 
@@ -922,27 +1057,30 @@ class CLIAgent:
                 )
 
                 # Record activity: tool call started
-                record_activity(
-                    "tool_start",
-                    name=tool_name,
-                    input=json.dumps(tool_args)[:200] if isinstance(tool_args, dict) else str(tool_args)[:200],
-                )
+                if self._bridge:
+                    self._bridge.activity(
+                        "tool_start",
+                        name=tool_name,
+                        input=json.dumps(tool_args)[:200] if isinstance(tool_args, dict) else str(tool_args)[:200],
+                    )
 
                 # Record to shared CLI metrics server history (for dashboard UI)
-                record_tool_history(
-                    name=tool_name,
-                    input_str=json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args),
-                    output_str=msg[:500],
-                    latency_ms=elapsed_ms,
-                    success=not error,
-                )
+                if self._bridge:
+                    self._bridge.tool_history(
+                        name=tool_name,
+                        input_str=json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args),
+                        output_str=msg[:500],
+                        latency_ms=elapsed_ms,
+                        success=not error,
+                    )
 
                 # Record activity: tool call completed
-                record_activity(
-                    "tool_end",
-                    name=tool_name,
-                    latency_ms=round(elapsed_ms, 2),
-                )
+                if self._bridge:
+                    self._bridge.activity(
+                        "tool_end",
+                        name=tool_name,
+                        latency_ms=round(elapsed_ms, 2),
+                    )
 
                 # Draw the bottom half with result and timing
                 _draw_tool_box_bottom(
@@ -1021,7 +1159,8 @@ class CLIAgent:
             ]
 
             # Record user message to dashboard activity feed
-            record_activity("user_msg", content=user_input[:200], thread=thread_id)
+            if self._bridge:
+                self._bridge.activity("user_msg", content=user_input[:200], thread=thread_id)
 
             self._metrics.record_task_start()
             turn_start = time.perf_counter()
@@ -1034,12 +1173,13 @@ class CLIAgent:
             self._metrics.record_task_complete(turn_elapsed_ms)
 
             # Record to shared CLI metrics server for dashboard UI
-            record_activity(
-                "turn_end",
-                latency_ms=round(turn_elapsed_ms, 1),
-                thread=thread_id,
-            )
-            record_session(thread_id, turns=1)
+            if self._bridge:
+                self._bridge.activity(
+                    "turn_end",
+                    latency_ms=round(turn_elapsed_ms, 1),
+                    thread=thread_id,
+                )
+                self._bridge.session(thread_id, turns=1)
 
             if text_response is None and updated_msgs:
                 # Try to extract text from last AI message

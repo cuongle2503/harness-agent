@@ -69,6 +69,17 @@ header {
 .header-right span { display: flex; align-items: center; gap: 6px; }
 .refresh-indicator { color: var(--cyan); font-size: 0.75rem; }
 
+/* Session selector */
+#session-selector {
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 5px 10px; font-family: var(--font); font-size: 0.78rem;
+  cursor: pointer; outline: none; max-width: 180px;
+  transition: border-color 0.2s;
+}
+#session-selector:hover, #session-selector:focus { border-color: var(--orange); }
+#session-selector option { background: var(--surface); color: var(--text); }
+
 /* ------------------------------------------------------------------ */
 /* Layout                                                              */
 /* ------------------------------------------------------------------ */
@@ -236,6 +247,9 @@ footer {
     <span style="font-size:0.72rem;color:var(--text-muted);" id="status-text">healthy</span>
   </div>
   <div class="header-right">
+    <select id="session-selector" onchange="switchSession(this.value)" title="Switch harness session">
+      <option value="">🖥 This session</option>
+    </select>
     <span>⏱ Uptime: <strong id="uptime">--</strong></span>
     <span>🔄 Refresh: <strong>2s</strong></span>
     <span class="refresh-indicator" id="refresh-dot">●</span>
@@ -528,12 +542,13 @@ function renderSessions(sessions) {
 // --------------------------------------------------------------------
 async function poll() {
   try {
+    const sq = currentSession ? '?session_id=' + encodeURIComponent(currentSession) : '';
     const [dashRes, metricsRes, healthRes, toolRes, sessionsRes] = await Promise.all([
-      fetch(`${API}/dashboard`),
-      fetch(`${API}/metrics`),
+      fetch(`${API}/dashboard${sq}`),
+      fetch(`${API}/metrics${sq}`),
       fetch(`${API}/health`).catch(() => null),
-      fetch(`${API}/tool-history`).catch(() => null),
-      fetch(`${API}/sessions`).catch(() => null),
+      fetch(`${API}/tool-history${sq}`).catch(() => null),
+      fetch(`${API}/sessions${sq}`).catch(() => null),
     ]);
 
     const dash = await dashRes.json();
@@ -666,6 +681,36 @@ function appendChat(role, sender, text) {
 }
 
 // --------------------------------------------------------------------
+// Session Selector — filter data by session (no redirect, single port)
+// --------------------------------------------------------------------
+let currentSession = '';  // empty = default/first session
+
+async function loadSessions() {
+  try {
+    const res = await fetch(`${API}/registry`);
+    if (!res.ok) return;
+    const sessions = await res.json();
+    const sel = $('session-selector');
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">🖥 Default session</option>';
+    sessions.forEach(s => {
+      const label = escHtml(s.name + ' (' + s.session_id + ')');
+      sel.innerHTML += '<option value="' + s.session_id + '">' + label + '</option>';
+    });
+    if (current && [...sel.options].some(o => o.value === current)) {
+      sel.value = current;
+    }
+  } catch (_) {}
+}
+
+function switchSession(sid) {
+  currentSession = sid;
+  // Immediately re-poll with the new session filter
+  poll();
+}
+
+// --------------------------------------------------------------------
 // Init
 // --------------------------------------------------------------------
 async function start() {
@@ -689,6 +734,10 @@ async function start() {
 
   poll(); // immediate first poll
   pollTimer = setInterval(poll, POLL_INTERVAL);
+
+  // Session registry — refresh every 5s
+  loadSessions();
+  setInterval(loadSessions, 5000);
 }
 
 document.addEventListener('DOMContentLoaded', start);

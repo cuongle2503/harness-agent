@@ -42,6 +42,13 @@ nav{display:flex;gap:4px}
 nav a{color:var(--t2);text-decoration:none;font-size:.72rem;font-weight:500;padding:6px 14px;border-radius:var(--radius);transition:all .15s}
 nav a:hover{background:#f1f5f9;color:var(--text)}
 nav a.on{background:#eff6ff;color:var(--blue)}
+#session-selector{
+  background:var(--surface);color:var(--text);
+  border:1px solid var(--border);border-radius:var(--radius);
+  padding:5px 10px;font-family:var(--font);font-size:.72rem;
+  cursor:pointer;outline:none;max-width:180px;
+}
+#session-selector:focus{border-color:var(--blue)}
 .stats{display:flex;gap:20px;font-size:.7rem;color:var(--t2)}
 .stats .stat{text-align:center}
 .stats .stat b{display:block;font-size:1.05rem;font-weight:700;color:var(--text)}
@@ -194,6 +201,9 @@ footer{
     <div class="stat"><b id="st-turns">0</b><span>Turns</span></div>
     <div class="stat"><b id="st-tools">0</b><span>Tools</span></div>
   </div>
+  <select id="session-selector" onchange="switchSession(this.value)" title="Switch harness session" style="margin-right:8px;">
+    <option value="">🖥 This session</option>
+  </select>
   <nav>
     <a href="/ui">Dashboard</a>
     <a href="/ui/activity" class="on">Live</a>
@@ -594,7 +604,8 @@ document.querySelectorAll('.node').forEach(el => {
 let seen = new Set();
 async function poll() {
   try {
-    const res = await fetch(`${API}/activity?count=40`);
+    const sq = currentSession ? '&session_id=' + encodeURIComponent(currentSession) : '';
+    const res = await fetch(`${API}/activity?count=40${sq}`);
     const fresh = (await res.json()).filter(e => {
       const k = `${e.type}-${e.time}`;
       if (seen.has(k)) return false; seen.add(k); return true;
@@ -678,6 +689,35 @@ function esc(s) {
 }
 
 // ═════════════════════════════════════════════════════════════
+// SESSION SELECTOR — filter data by session (no redirect, single port)
+// ═════════════════════════════════════════════════════════════
+let currentSession = '';
+
+async function loadSessions() {
+  try {
+    const res = await fetch(`${API}/registry`);
+    if (!res.ok) return;
+    const sessions = await res.json();
+    const sel = document.getElementById('session-selector');
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">🖥 Default session</option>';
+    sessions.forEach(s => {
+      const label = esc(s.name + ' (' + s.session_id + ')');
+      sel.innerHTML += '<option value="' + s.session_id + '">' + label + '</option>';
+    });
+    if (current && [...sel.options].some(o => o.value === current)) {
+      sel.value = current;
+    }
+  } catch (_) {}
+}
+
+function switchSession(sid) {
+  currentSession = sid;
+  poll();
+}
+
+// ═════════════════════════════════════════════════════════════
 // INIT
 // ═════════════════════════════════════════════════════════════
 const PAGE_LOAD_TIME = Date.now() / 1000;
@@ -688,6 +728,9 @@ async function init() {
   resetAllBadges();
   setInterval(poll, 1000);
   document.fonts.ready.then(() => layout());
+  // Session registry — refresh every 5s
+  loadSessions();
+  setInterval(loadSessions, 5000);
 }
 
 function resetAllBadges() {
