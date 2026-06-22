@@ -153,13 +153,13 @@ def record_session(
         sess["last_active"] = _ttt.monotonic()
 
 
-def register_session(session_id: str, name: str, agent_id: str) -> None:
+def register_session(session_id: str, name: str, agent_id: str, pid: int = 0) -> None:
     """Register a CLI session (called via POST /register or host init)."""
     with _sessions_lock:
         s = _get_or_create_session(session_id)
         s["name"] = name or agent_id
         s["agent_id"] = agent_id
-        s["pid"] = os.getpid()
+        s["pid"] = pid or os.getpid()
 
 
 def unregister_session(session_id: str) -> None:
@@ -400,7 +400,8 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         sid = body.get("session_id") or uuid.uuid4().hex[:8]
         name = body.get("name", sid)
         agent_id = body.get("agent_id", sid)
-        register_session(sid, name, agent_id)
+        pid = body.get("pid", 0)
+        register_session(sid, name, agent_id, pid=pid)
         self._send_json({"session_id": sid, "status": "registered"})
 
     def _handle_post_unregister(self) -> None:

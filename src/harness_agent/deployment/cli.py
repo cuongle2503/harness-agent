@@ -777,12 +777,15 @@ class CLIAgent:
             session_id = f"{self.config.assistant_id}-{os.getpid()}"
 
         # Check if an aggregator is already running on this port
+        # Retry a few times — the server daemon thread may not be ready yet
         aggregator_alive = False
-        try:
-            _ur.urlopen(f"http://127.0.0.1:{port}/health", timeout=1)
-            aggregator_alive = True
-        except Exception:
-            pass
+        for _ in range(3):
+            try:
+                _ur.urlopen(f"http://127.0.0.1:{port}/health", timeout=1)
+                aggregator_alive = True
+                break
+            except Exception:
+                time.sleep(0.3)
 
         if aggregator_alive:
             # --- CLIENT MODE ---
@@ -794,6 +797,7 @@ class CLIAgent:
                     "session_id": session_id,
                     "name": name,
                     "agent_id": self.config.assistant_id,
+                    "pid": os.getpid(),
                 }).encode("utf-8")
                 req = _ur.Request(
                     f"http://127.0.0.1:{port}/register",
