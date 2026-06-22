@@ -416,6 +416,7 @@ const API = '';
 const POLL_INTERVAL = 2000;
 let pollTimer = null;
 let sparklineHistory = new Array(30).fill(0);
+let chatAvailable = true;  // set to false if /agent/invoke returns 404
 
 // --------------------------------------------------------------------
 // Helpers
@@ -500,6 +501,11 @@ function shortenThreadId(id) {
 
 function renderSessions(sessions) {
   const tbody = $('sessions-tbody');
+  if (sessions === null) {
+    // Endpoint returned an error — likely not available
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-muted);">Session tracking unavailable</td></tr>';
+    return;
+  }
   if (!sessions || sessions.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-muted);">No sessions yet — send a message to start</td></tr>';
     return;
@@ -534,7 +540,7 @@ async function poll() {
     const metrics = await metricsRes.json();
     const health = healthRes ? await healthRes.json() : null;
     const tools = toolRes ? await toolRes.json() : [];
-    const sessions = sessionsRes ? await sessionsRes.json() : [];
+    const sessions = sessionsRes ? await sessionsRes.json() : null;
 
     renderDashboard(dash, metrics, health);
     renderToolFeed(tools);
@@ -617,6 +623,7 @@ function renderDashboard(dash, metrics, health) {
 let threadId = 'dashboard-' + Date.now();
 
 async function sendMessage() {
+  if (!chatAvailable) return;
   const input = $('chat-input');
   const msg = input.value.trim();
   if (!msg) return;
@@ -661,7 +668,25 @@ function appendChat(role, sender, text) {
 // --------------------------------------------------------------------
 // Init
 // --------------------------------------------------------------------
-function start() {
+async function start() {
+  // Probe whether /agent/invoke is available (server mode vs CLI mode)
+  try {
+    const probe = await fetch(`${API}/agent/invoke`, { method: 'HEAD' });
+    chatAvailable = probe.ok || probe.status !== 404;
+  } catch (_) {
+    chatAvailable = false;
+  }
+  if (!chatAvailable) {
+    const input = $('chat-input');
+    const btn = $('chat-send');
+    input.disabled = true;
+    input.placeholder = 'Chat available in server mode only — use the CLI terminal';
+    btn.disabled = true;
+    btn.textContent = 'CLI';
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+  }
+
   poll(); // immediate first poll
   pollTimer = setInterval(poll, POLL_INTERVAL);
 }

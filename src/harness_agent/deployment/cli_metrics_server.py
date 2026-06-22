@@ -14,16 +14,17 @@ Usage::
 from __future__ import annotations
 
 import json
+import os
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 
+from harness_agent.memory.hybrid_memory import HybridMemory
 from harness_agent.monitoring.dashboard import (
     build_dashboard_response,
 )
 from harness_agent.monitoring.metrics import AgentMetrics
-from harness_agent.memory.hybrid_memory import HybridMemory
 
 
 def _load_static_html(filename: str) -> str:
@@ -42,6 +43,13 @@ _ACTIVITY_HTML: str = _load_static_html("activity.html")
 _tool_history: list[dict[str, Any]] = []
 _MAX_TOOL_HISTORY = 100
 
+# Shared activity log (written by CLI agent, read by /activity endpoint)
+_activity_log: list[dict[str, Any]] = []
+_MAX_ACTIVITY = 200
+
+# Shared per-session metrics (written by CLI agent, read by /sessions endpoint)
+_session_metrics: dict[str, dict[str, Any]] = {}
+
 
 def record_tool_history(
     name: str, input_str: str, output_str: str,
@@ -59,6 +67,57 @@ def record_tool_history(
     })
     if len(_tool_history) > _MAX_TOOL_HISTORY:
         _tool_history.pop(0)
+
+
+def record_activity(
+    event_type: str,
+    **kwargs: Any,
+) -> None:
+    """Record an activity event (called by CLI agent).
+
+    Args:
+        event_type: Event type label (user_msg, llm_start, tool_start,
+            tool_end, turn_end, system_prompt).
+        **kwargs: Arbitrary event data merged into the record.
+    """
+    import time as _tt
+    entry: dict[str, Any] = {"type": event_type, "time": _tt.monotonic()}
+    entry.update(kwargs)
+    _activity_log.append(entry)
+    if len(_activity_log) > _MAX_ACTIVITY:
+        _activity_log.pop(0)
+
+
+def record_session(
+    thread_id: str,
+    **kwargs: Any,
+) -> None:
+    """Upsert per-session metrics (called by CLI agent).
+
+    Args:
+        thread_id: Session thread identifier.
+        **kwargs: Metrics to merge into the session record
+            (e.g. input_tokens, output_tokens, api_calls, tool_calls, turns).
+    """
+    import time as _ttt
+    sess = _session_metrics.get(thread_id)
+    if sess is None:
+        sess = {
+            "thread_id": thread_id,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "api_calls": 0,
+            "tool_calls": 0,
+            "turns": 0,
+            "created_at": _ttt.time(),
+        }
+        _session_metrics[thread_id] = sess
+    for key, value in kwargs.items():
+        if key in ("input_tokens", "output_tokens", "api_calls", "tool_calls", "turns"):
+            sess[key] = sess.get(key, 0) + int(value)
+        else:
+            sess[key] = value
+    sess["last_active"] = _ttt.monotonic()
 
 
 class _MetricsHandler(BaseHTTPRequestHandler):
@@ -113,13 +172,17 @@ class _MetricsHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         """Route GET requests."""
-        path = self.path.rstrip("/") or "/"
+        from urllib.parse import urlparse
+
+        path = urlparse(self.path).path.rstrip("/") or "/"
 
         routes: dict[str, Any] = {
             "/health": self._handle_health,
             "/metrics": self._handle_metrics,
             "/dashboard": self._handle_dashboard,
             "/tool-history": self._handle_tool_history,
+            "/activity": self._handle_activity,
+            "/sessions": self._handle_sessions,
             "/ui": self._handle_ui,
             "/ui/activity": self._handle_ui_activity,
             "/": self._handle_root,
@@ -174,12 +237,33 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         """Return recent tool calls with details."""
         count = 20
         try:
-            from urllib.parse import urlparse, parse_qs
+            from urllib.parse import parse_qs, urlparse
             qs = parse_qs(urlparse(self.path).query)
             count = int(qs.get("count", [20])[0])
         except Exception:
             pass
         self._send_json(_tool_history[-count:])
+
+    def _handle_activity(self) -> None:
+        """Return recent activity events for the real-time trace page."""
+        count = 50
+        try:
+            from urllib.parse import parse_qs, urlparse
+            qs = parse_qs(urlparse(self.path).query)
+            count = int(qs.get("count", [50])[0])
+        except Exception:
+            pass
+        self._send_json(_activity_log[-count:])
+
+    def _handle_sessions(self) -> None:
+        """Return per-session (per-thread) metrics."""
+        self._send_json(
+            sorted(
+                _session_metrics.values(),
+                key=lambda s: s.get("last_active", 0),
+                reverse=True,
+            )
+        )
 
     def _handle_root(self) -> None:
         self.send_response(302)
@@ -216,7 +300,8 @@ def start_metrics_server(
     _MetricsHandler.agent_id = agent_id
     _MetricsHandler.sandbox_type = sandbox_type
 
-    server = HTTPServer(("127.0.0.1", port), _MetricsHandler)
+    host = os.environ.get("HARNESS_MONITORING_HOST", "127.0.0.1")
+    server = HTTPServer((host, port), _MetricsHandler)
 
     thread = threading.Thread(
         target=server.serve_forever,

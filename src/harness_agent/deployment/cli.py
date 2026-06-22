@@ -29,6 +29,11 @@ from langchain_core.runnables import RunnableConfig
 
 from harness_agent.config import AgentModelSelection
 from harness_agent.core.agent import DEFAULT_MAX_TOOL_ITERATIONS, HarnessAgent
+from harness_agent.deployment.cli_metrics_server import (
+    record_activity,
+    record_session,
+    record_tool_history,
+)
 from harness_agent.memory.hybrid_memory import HybridMemory
 from harness_agent.monitoring.metrics import AgentMetrics
 from harness_agent.prompts import load_prompt
@@ -825,6 +830,33 @@ class CLIAgent:
             if accumulated is None:
                 return ("", full_msgs)
 
+            # Extract usage metadata from the accumulated chunk for metrics
+            usage_meta: dict[str, Any] = getattr(accumulated, "usage_metadata", None) or {}
+            input_tokens = usage_meta.get("input_tokens", 0)
+            output_tokens = usage_meta.get("output_tokens", 0)
+            total_tokens = usage_meta.get("total_tokens", 0)
+            if not total_tokens:
+                total_tokens = input_tokens + output_tokens
+
+            # Record model call metrics for the monitoring dashboard
+            self._metrics.record_model_call(
+                latency_ms=0.0,  # per-iteration latency tracked via turn-level
+                success=True,
+                tokens=int(total_tokens),
+                input_tokens=int(input_tokens),
+                output_tokens=int(output_tokens),
+            )
+
+            # Update session metrics with token/API call counts
+            if total_tokens or input_tokens or output_tokens:
+                tid = config.get("configurable", {}).get("thread_id", "default")
+                record_session(
+                    tid,
+                    input_tokens=int(input_tokens),
+                    output_tokens=int(output_tokens),
+                    api_calls=1,
+                )
+
             content = _extract_chunk_text(accumulated)
 
             # Resolve tool calls
@@ -887,6 +919,29 @@ class CLIAgent:
                 # Record tool call metrics for the monitoring dashboard
                 self._metrics.record_tool_call(
                     tool_name, elapsed_ms, success=not error
+                )
+
+                # Record activity: tool call started
+                record_activity(
+                    "tool_start",
+                    name=tool_name,
+                    input=json.dumps(tool_args)[:200] if isinstance(tool_args, dict) else str(tool_args)[:200],
+                )
+
+                # Record to shared CLI metrics server history (for dashboard UI)
+                record_tool_history(
+                    name=tool_name,
+                    input_str=json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args),
+                    output_str=msg[:500],
+                    latency_ms=elapsed_ms,
+                    success=not error,
+                )
+
+                # Record activity: tool call completed
+                record_activity(
+                    "tool_end",
+                    name=tool_name,
+                    latency_ms=round(elapsed_ms, 2),
                 )
 
                 # Draw the bottom half with result and timing
@@ -965,6 +1020,9 @@ class CLIAgent:
                 HumanMessage(content=user_input),
             ]
 
+            # Record user message to dashboard activity feed
+            record_activity("user_msg", content=user_input[:200], thread=thread_id)
+
             self._metrics.record_task_start()
             turn_start = time.perf_counter()
 
@@ -974,6 +1032,14 @@ class CLIAgent:
 
             turn_elapsed_ms = (time.perf_counter() - turn_start) * 1000
             self._metrics.record_task_complete(turn_elapsed_ms)
+
+            # Record to shared CLI metrics server for dashboard UI
+            record_activity(
+                "turn_end",
+                latency_ms=round(turn_elapsed_ms, 1),
+                thread=thread_id,
+            )
+            record_session(thread_id, turns=1)
 
             if text_response is None and updated_msgs:
                 # Try to extract text from last AI message
