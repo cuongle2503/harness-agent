@@ -160,6 +160,8 @@ def register_session(session_id: str, name: str, agent_id: str, pid: int = 0) ->
         s["name"] = name or agent_id
         s["agent_id"] = agent_id
         s["pid"] = pid or os.getpid()
+    print(f"[aggregator] session registered: {session_id} (pid={s['pid']}, "
+          f"total={len(_sessions)})")
 
 
 def unregister_session(session_id: str) -> None:
