@@ -776,12 +776,16 @@ class CLIAgent:
         else:
             session_id = f"{self.config.assistant_id}-{os.getpid()}"
 
+        # No proxy for localhost — urllib may route through http_proxy otherwise
+        _no_proxy = _ur.ProxyHandler({})
+        _opener = _ur.build_opener(_no_proxy)
+
         # Check if an aggregator is already running on this port
         # Retry — the server daemon thread may not be ready yet
         aggregator_alive = False
         for attempt in range(5):
             try:
-                _ur.urlopen(f"http://127.0.0.1:{port}/health", timeout=1)
+                _opener.open(f"http://127.0.0.1:{port}/health", timeout=1)
                 aggregator_alive = True
                 break
             except Exception:
@@ -828,6 +832,8 @@ class CLIAgent:
         """Try to register as a client with an existing aggregator."""
         import urllib.request as _ur
         url = f"http://127.0.0.1:{port}"
+        _no_proxy = _ur.ProxyHandler({})
+        _opener = _ur.build_opener(_no_proxy)
         try:
             body = json.dumps({
                 "session_id": session_id,
@@ -840,7 +846,7 @@ class CLIAgent:
                 data=body,
                 headers={"Content-Type": "application/json"},
             )
-            resp = json.loads(_ur.urlopen(req, timeout=3).read())
+            resp = json.loads(_opener.open(req, timeout=3).read())
             actual_sid = resp.get("session_id", session_id)
             self._session_id = actual_sid
             self._bridge = _MetricsBridge(actual_sid, http_port=port)
