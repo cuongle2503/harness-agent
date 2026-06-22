@@ -825,6 +825,7 @@ class CLIAgent:
                     agent_id=self.config.assistant_id,
                     sandbox_type=self.config.sandbox_type,
                     session_name=name,
+                    session_id=session_id,
                 )
                 self._session_id = session_id
                 self._bridge = _MetricsBridge(session_id)  # host mode

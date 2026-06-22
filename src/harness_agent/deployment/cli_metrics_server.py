@@ -488,6 +488,7 @@ def start_metrics_server(
     agent_id: str = "harness-agent-cli",
     sandbox_type: str = "docker",
     session_name: str = "",
+    session_id: str = "",
 ) -> tuple[HTTPServer, int]:
     """Start a background metrics HTTP aggregator server.
 
@@ -499,6 +500,7 @@ def start_metrics_server(
         agent_id: Agent identifier for health checks.
         sandbox_type: Sandbox type for health checks.
         session_name: Human-readable label for the UI session selector.
+        session_id: Unique session identifier (auto-generated if empty).
 
     Returns:
         Tuple of (running HTTPServer, actual_port_bound).
@@ -507,7 +509,7 @@ def start_metrics_server(
         OSError: If the port cannot be bound.
     """
     name = session_name or os.environ.get("HARNESS_SESSION_NAME", "")
-    sid = name or agent_id
+    sid = session_id or name or agent_id
 
     # Inject state into the handler class
     _MetricsHandler.metrics = metrics
