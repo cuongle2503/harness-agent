@@ -788,94 +788,72 @@ class CLIAgent:
                 if attempt < 4:
                     time.sleep(0.5)
 
+        # --- Try client mode first (POST /register) ---
         if aggregator_alive:
-            # --- CLIENT MODE ---
+            result = self._try_client_mode(port, session_id, name)
+            if result is not None:
+                return result
+
+        # --- HOST MODE: start aggregator ---
+        try:
+            server, actual_port = start_metrics_server(
+                metrics=self._metrics,
+                start_time=self._start_time,
+                memory=self._memory,
+                port=port,
+                agent_id=self.config.assistant_id,
+                sandbox_type=self.config.sandbox_type,
+                session_name=name,
+                session_id=session_id,
+            )
             self._session_id = session_id
-            self._bridge = _MetricsBridge(session_id, http_port=port)
-            # Register with the existing aggregator
-            try:
-                body = json.dumps({
-                    "session_id": session_id,
-                    "name": name,
-                    "agent_id": self.config.assistant_id,
-                    "pid": os.getpid(),
-                }).encode("utf-8")
-                req = _ur.Request(
-                    f"http://127.0.0.1:{port}/register",
-                    data=body,
-                    headers={"Content-Type": "application/json"},
-                )
-                resp = json.loads(_ur.urlopen(req, timeout=2).read())
-                actual_sid = resp.get("session_id", session_id)
-                if actual_sid != session_id:
-                    self._session_id = actual_sid
-                    self._bridge = _MetricsBridge(actual_sid, http_port=port)
-                    note = f'session_id "{session_id}" taken, using "{actual_sid}"'
-                    print(f"\n  {Color.dim(note)}")
-                print(f"\n  {Color.success('📊 Dashboard:')} "
-                      f"{Color.paint(f'http://127.0.0.1:{port}/ui', Color.CYAN)}")
-                msg = f'connected to existing aggregator as "{actual_sid}"'
-                print(f"  {Color.dim(msg)}")
-                # Register cleanup on exit
-                import atexit as _ae
-                _ae.register(self._unregister_from_aggregator)
-                return None  # no server to manage
-            except Exception as e:
-                print(f"\n  {Color.warn(f'⚠ Failed to register with aggregator: {e}')}")
-                print(f"  {Color.dim('Metrics and UI unavailable this session.')}")
-                self._bridge = None
-                return None
-        else:
-            # --- HOST MODE ---
-            try:
-                server, actual_port = start_metrics_server(
-                    metrics=self._metrics,
-                    start_time=self._start_time,
-                    memory=self._memory,
-                    port=port,
-                    agent_id=self.config.assistant_id,
-                    sandbox_type=self.config.sandbox_type,
-                    session_name=name,
-                    session_id=session_id,
-                )
-                self._session_id = session_id
-                self._bridge = _MetricsBridge(session_id)  # host mode
-                url = f"http://127.0.0.1:{actual_port}/ui"
-                print(f"\n  {Color.success('📊 Dashboard:')} "
-                      f"{Color.paint(url, Color.CYAN)}")
-                msg2 = f'aggregator started, session: "{session_id}"'
-                print(f"  {Color.dim(msg2)}")
-                return server
-            except OSError as e:
-                # Port likely in use by another aggregator — try client mode
-                print(f"\n  {Color.dim(f'Port {port} in use, trying client mode...')}")
-                try:
-                    body = json.dumps({
-                        "session_id": session_id,
-                        "name": name,
-                        "agent_id": self.config.assistant_id,
-                        "pid": os.getpid(),
-                    }).encode("utf-8")
-                    req = _ur.Request(
-                        f"http://127.0.0.1:{port}/register",
-                        data=body,
-                        headers={"Content-Type": "application/json"},
-                    )
-                    resp = json.loads(_ur.urlopen(req, timeout=2).read())
-                    actual_sid = resp.get("session_id", session_id)
-                    self._session_id = actual_sid
-                    self._bridge = _MetricsBridge(actual_sid, http_port=port)
-                    print(f"  {Color.success('📊 Dashboard:')} "
-                          f"{Color.paint(f'http://127.0.0.1:{port}/ui', Color.CYAN)}")
-                    msg = f'connected to existing aggregator as "{actual_sid}"'
-                    print(f"  {Color.dim(msg)}")
-                    import atexit as _ae2
-                    _ae2.register(self._unregister_from_aggregator)
-                    return None
-                except Exception as e2:
-                    print(f"  {Color.warn(f'⚠ Dashboard unavailable: {e2}')}")
-                    print(f"  {Color.dim('Metrics and UI unavailable this session.')}")
-                    return None
+            self._bridge = _MetricsBridge(session_id)  # host mode
+            url = f"http://127.0.0.1:{actual_port}/ui"
+            print(f"\n  {Color.success('📊 Dashboard:')} "
+                  f"{Color.paint(url, Color.CYAN)}")
+            msg2 = f'aggregator started, session: "{session_id}"'
+            print(f"  {Color.dim(msg2)}")
+            return server
+        except OSError:
+            # Port in use — aggregator exists but health check missed it
+            result = self._try_client_mode(port, session_id, name)
+            if result is not None:
+                return result
+            print(f"\n  {Color.warn('⚠ Dashboard server: port in use')}")
+            print(f"  {Color.dim('Metrics and UI unavailable this session.')}")
+            return None
+
+    def _try_client_mode(self, port: int, session_id: str, name: str) -> Any:
+        """Try to register as a client with an existing aggregator."""
+        import urllib.request as _ur
+        try:
+            body = json.dumps({
+                "session_id": session_id,
+                "name": name,
+                "agent_id": self.config.assistant_id,
+                "pid": os.getpid(),
+            }).encode("utf-8")
+            req = _ur.Request(
+                f"http://127.0.0.1:{port}/register",
+                data=body,
+                headers={"Content-Type": "application/json"},
+            )
+            resp = json.loads(_ur.urlopen(req, timeout=3).read())
+            actual_sid = resp.get("session_id", session_id)
+            self._session_id = actual_sid
+            self._bridge = _MetricsBridge(actual_sid, http_port=port)
+            if actual_sid != session_id:
+                note = f'session_id "{session_id}" taken, using "{actual_sid}"'
+                print(f"\n  {Color.dim(note)}")
+            print(f"\n  {Color.success('📊 Dashboard:')} "
+                  f"{Color.paint(f'http://127.0.0.1:{port}/ui', Color.CYAN)}")
+            msg = f'connected to existing aggregator as "{actual_sid}"'
+            print(f"  {Color.dim(msg)}")
+            import atexit as _ae
+            _ae.register(self._unregister_from_aggregator)
+            return None  # client mode, no server to manage
+        except Exception as e:
+            return None  # signal failure to caller
 
     def _unregister_from_aggregator(self) -> None:
         """Notify aggregator that this session is gone (client mode)."""

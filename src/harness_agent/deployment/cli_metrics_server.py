@@ -289,7 +289,10 @@ class _MetricsHandler(BaseHTTPRequestHandler):
 
         handler = post_routes.get(path)
         if handler:
-            handler()
+            try:
+                handler()
+            except Exception:
+                self._send_json({"error": "internal error"}, status=500)
         else:
             self._send_json({"error": "not found", "path": path}, status=404)
 
