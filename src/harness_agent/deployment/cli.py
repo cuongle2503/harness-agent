@@ -769,7 +769,11 @@ class CLIAgent:
         name = self.config.session_name or os.environ.get(
             "HARNESS_SESSION_NAME", ""
         )
-        session_id = name or self.config.assistant_id
+        # Ensure unique session_id: use name if set, otherwise agent_id + short PID suffix
+        if name:
+            session_id = name
+        else:
+            session_id = f"{self.config.assistant_id}-{os.getpid()}"
 
         # Check if an aggregator is already running on this port
         aggregator_alive = False
