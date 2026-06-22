@@ -827,6 +827,7 @@ class CLIAgent:
     def _try_client_mode(self, port: int, session_id: str, name: str) -> Any:
         """Try to register as a client with an existing aggregator."""
         import urllib.request as _ur
+        url = f"http://127.0.0.1:{port}"
         try:
             body = json.dumps({
                 "session_id": session_id,
@@ -835,7 +836,7 @@ class CLIAgent:
                 "pid": os.getpid(),
             }).encode("utf-8")
             req = _ur.Request(
-                f"http://127.0.0.1:{port}/register",
+                f"{url}/register",
                 data=body,
                 headers={"Content-Type": "application/json"},
             )
@@ -854,7 +855,8 @@ class CLIAgent:
             _ae.register(self._unregister_from_aggregator)
             return None  # client mode, no server to manage
         except Exception as e:
-            print(f"\n  {Color.warn(f'⚠ Client mode failed: {e}')}")
+            msg = f'⚠ Cannot reach aggregator at http://127.0.0.1:{port}: {e}'
+            print(f"\n  {Color.warn(msg)}")
             return None  # signal failure to caller
 
     def _unregister_from_aggregator(self) -> None:
