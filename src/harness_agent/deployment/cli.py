@@ -77,10 +77,11 @@ class _MetricsBridge:
         else:
             record_session(thread_id, session_id=self.sid, **kw)
 
-    def push_metrics(self) -> None:
+    def push_metrics(self, metrics_dict: dict[str, Any]) -> None:
         """Push current metrics snapshot (client mode only)."""
         if not self._port:
             return
+        self._post("/push/metrics", {"metrics": metrics_dict})
 
     def _post(self, path: str, data: dict[str, Any]) -> None:
         """Fire-and-forget HTTP POST to aggregator."""
@@ -1205,6 +1206,10 @@ class CLIAgent:
                     turn_key,
                     {"user": user_input, "assistant": text_response or "(tool only)"},
                 )
+
+            # Push full metrics snapshot (client mode syncs to aggregator)
+            if self._bridge:
+                self._bridge.push_metrics(self._metrics.to_dict())
 
     # ------------------------------------------------------------------
     # Slash command system

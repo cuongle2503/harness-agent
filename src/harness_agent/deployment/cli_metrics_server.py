@@ -451,13 +451,26 @@ class _MetricsHandler(BaseHTTPRequestHandler):
             s = _get_or_create_session(sid)
             metrics_data = body.get("metrics", {})
             m = s["metrics"]
-            # Merge numeric fields from pushed metrics
-            for field in ("model_calls", "model_errors", "total_tokens",
-                          "input_tokens", "output_tokens", "tool_calls",
-                          "tool_errors", "total_tasks", "completed_tasks"):
-                val = metrics_data.get(field, 0)
+            # Map to_dict() keys → internal attribute names (some are properties)
+            _FIELD_MAP = {
+                "model_calls": "model_calls",
+                "model_errors": "model_errors",
+                "token_usage_total": "total_tokens",
+                "input_tokens": "input_tokens",
+                "output_tokens": "output_tokens",
+                "tool_calls": "tool_calls",
+                "tool_errors": "tool_errors",
+                "total_tasks": "total_tasks",
+                "completed_tasks": "completed_tasks",
+                "subagent_spawn_count": "subagent_spawns",
+                "subagent_completes": "subagent_completes",
+                "hitl_approvals": "hitl_approvals",
+                "hitl_rejections": "hitl_rejections",
+            }
+            for dict_key, attr_name in _FIELD_MAP.items():
+                val = metrics_data.get(dict_key, 0)
                 if val:
-                    setattr(m, field, getattr(m, field, 0) + int(val))
+                    setattr(m, attr_name, getattr(m, attr_name, 0) + int(val))
         self._send_json({"status": "ok"})
 
 
