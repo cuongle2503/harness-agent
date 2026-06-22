@@ -54,6 +54,7 @@ class _MetricsBridge:
         self.sid = session_id
         self._port = http_port
         self._url = f"http://127.0.0.1:{http_port}" if http_port else ""
+        self._push_ok = True  # becomes False on first failure
 
     @property
     def is_host(self) -> bool:
@@ -84,18 +85,22 @@ class _MetricsBridge:
         self._post("/push/metrics", {"metrics": metrics_dict})
 
     def _post(self, path: str, data: dict[str, Any]) -> None:
-        """Fire-and-forget HTTP POST to aggregator."""
-        import urllib.request
+        """Fire-and-forget HTTP POST to aggregator (no proxy)."""
+        import urllib.request as _ur
         body = json.dumps({**data, "session_id": self.sid}).encode("utf-8")
         try:
-            req = urllib.request.Request(
+            req = _ur.Request(
                 self._url + path,
                 data=body,
                 headers={"Content-Type": "application/json"},
             )
-            urllib.request.urlopen(req, timeout=2)
+            _no_proxy = _ur.ProxyHandler({})
+            _ur.build_opener(_no_proxy).open(req, timeout=2)
         except Exception:
-            pass  # best-effort: don't block the CLI on metrics push
+            if self._push_ok:
+                self._push_ok = False
+                print(f"\n  ⚠ Metrics push failed (proxy may block localhost "
+                      f"connections)")
 
 # ---------------------------------------------------------------------------
 # Terminal colors (ANSI)
