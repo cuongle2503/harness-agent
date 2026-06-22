@@ -248,7 +248,7 @@ footer {
   </div>
   <div class="header-right">
     <select id="session-selector" onchange="switchSession(this.value)" title="Switch harness session">
-      <option value="">🖥 This session</option>
+      <option value="">Sessions (<span id="session-count">0</span>)</option>
     </select>
     <span>⏱ Uptime: <strong id="uptime">--</strong></span>
     <span>🔄 Refresh: <strong>2s</strong></span>
@@ -687,13 +687,14 @@ let currentSession = '';  // empty = default/first session
 
 async function loadSessions() {
   try {
-    const res = await fetch(`${API}/registry`);
+    // Cache-bust to avoid stale responses
+    const res = await fetch(`${API}/registry?_=${Date.now()}`);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const sessions = await res.json();
     const sel = $('session-selector');
     if (!sel) return;
     const current = sel.value;
-    sel.innerHTML = '<option value="">🖥 Default session</option>';
+    sel.innerHTML = '<option value="">Sessions (<span id="session-count">' + (sessions ? sessions.length : 0) + '</span>)</option>';
     if (!sessions || sessions.length === 0) {
       sel.innerHTML += '<option disabled>-- no sessions --</option>';
     } else {
@@ -707,7 +708,7 @@ async function loadSessions() {
     }
   } catch (_) {
     const sel = $('session-selector');
-    if (sel) sel.innerHTML = '<option value="">🖥 Default session</option><option disabled>-- registry unavailable --</option>';
+    if (sel) sel.innerHTML = '<option value="">Sessions (err)</option>';
   }
 }
 

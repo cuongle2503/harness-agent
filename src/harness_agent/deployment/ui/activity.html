@@ -202,7 +202,7 @@ footer{
     <div class="stat"><b id="st-tools">0</b><span>Tools</span></div>
   </div>
   <select id="session-selector" onchange="switchSession(this.value)" title="Switch harness session" style="margin-right:8px;">
-    <option value="">🖥 This session</option>
+    <option value="">Sessions (0)</option>
   </select>
   <nav>
     <a href="/ui">Dashboard</a>
@@ -701,7 +701,7 @@ async function loadSessions() {
     const sel = document.getElementById('session-selector');
     if (!sel) return;
     const current = sel.value;
-    sel.innerHTML = '<option value="">🖥 Default session</option>';
+    sel.innerHTML = '<option value="">Sessions (' + (sessions ? sessions.length : 0) + ')</option>';
     if (!sessions || sessions.length === 0) {
       sel.innerHTML += '<option disabled>-- no sessions --</option>';
     } else {
