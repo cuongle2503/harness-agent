@@ -859,7 +859,7 @@ class CLIAgent:
             print(f"  {Color.dim(msg)}")
             import atexit as _ae
             _ae.register(self._unregister_from_aggregator)
-            return None  # client mode, no server to manage
+            return True  # success (client mode, no server)
         except Exception as e:
             msg = f'⚠ Cannot reach aggregator at http://127.0.0.1:{port}: {e}'
             print(f"\n  {Color.warn(msg)}")
