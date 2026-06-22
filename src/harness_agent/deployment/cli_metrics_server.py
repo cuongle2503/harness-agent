@@ -270,7 +270,12 @@ class _MetricsHandler(BaseHTTPRequestHandler):
 
         handler = routes.get(path)
         if handler:
-            handler()
+            try:
+                handler()
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self._send_json({"error": str(e)}, status=500)
         else:
             self._send_json({"error": "not found", "path": path}, status=404)
 
@@ -291,8 +296,10 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         if handler:
             try:
                 handler()
-            except Exception:
-                self._send_json({"error": "internal error"}, status=500)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self._send_json({"error": str(e)}, status=500)
         else:
             self._send_json({"error": "not found", "path": path}, status=404)
 
