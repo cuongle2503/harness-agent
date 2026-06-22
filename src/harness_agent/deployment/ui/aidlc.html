@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIDLC — AI Development Life Cycle</title>
+<style>
+/* ------------------------------------------------------------------ */
+/* Reset & Base — dark flame theme                                     */
+/* ------------------------------------------------------------------ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d0d0f;
+  --surface:   #16161a;
+  --surface-2: #1e1e24;
+  --border:    #2a2a35;
+  --text:      #e0e0e0;
+  --text-dim:  #888896;
+  --text-muted:#5c5c6e;
+  --orange:    #ff8c42;
+  --gold:      #ffb347;
+  --red:       #ff4444;
+  --green:     #44cc66;
+  --cyan:      #44ccff;
+  --blue:      #6688ff;
+  --magenta:   #cc66ff;
+  --completed: #44cc66;
+  --in-progress: #ffb347;
+  --pending:   #5c5c6e;
+  --radius:    8px;
+  --font:      'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+html { font-size: 14px; }
+body {
+  font-family: var(--font); background: var(--bg);
+  color: var(--text); min-height: 100vh; line-height: 1.5;
+}
+
+/* ------------------------------------------------------------------ */
+/* Header                                                              */
+/* ------------------------------------------------------------------ */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-left h1 {
+  font-size: 1.25rem; font-weight: 700;
+  background: linear-gradient(90deg, var(--red), var(--orange), var(--gold));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.header-right { display: flex; align-items: center; gap: 16px; }
+.nav-link {
+  color: var(--cyan); text-decoration: none; font-size: 0.82rem;
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+  transition: border-color 0.2s, background 0.2s;
+}
+.nav-link:hover { border-color: var(--orange); background: var(--surface-2); }
+.progress-badge {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 6px 14px; font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.progress-badge strong { color: var(--gold); }
+
+/* ------------------------------------------------------------------ */
+/* Layout                                                              */
+/* ------------------------------------------------------------------ */
+main { padding: 24px; max-width: 1300px; margin: 0 auto; }
+
+/* ------------------------------------------------------------------ */
+/* Phase Stepper Timeline                                              */
+/* ------------------------------------------------------------------ */
+.stepper {
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 28px; flex-wrap: wrap; gap: 0;
+}
+.step {
+  display: flex; flex-direction: column; align-items: center;
+  cursor: pointer; transition: transform 0.2s; min-width: 90px;
+}
+.step:hover { transform: translateY(-2px); }
+.step-dot {
+  width: 32px; height: 32px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-weight: 700;
+  font-size: 0.75rem; transition: all 0.3s; position: relative;
+}
+.step-dot.completed { background: var(--completed); color: #000; box-shadow: 0 0 12px rgba(68,204,102,0.4); }
+.step-dot.in_progress { background: var(--in-progress); color: #000; box-shadow: 0 0 12px rgba(255,179,71,0.5); animation: pulse-gold 2s infinite; }
+.step-dot.pending { background: var(--pending); color: var(--text-dim); }
+@keyframes pulse-gold {
+  0%,100% { box-shadow: 0 0 8px rgba(255,179,71,0.3); }
+  50% { box-shadow: 0 0 20px rgba(255,179,71,0.7); }
+}
+.step-label { font-size: 0.65rem; color: var(--text-dim); margin-top: 6px; text-align: center; }
+.step-title { font-size: 0.58rem; color: var(--text-muted); text-align: center; text-transform: uppercase; letter-spacing: 0.05em; }
+.step.active .step-label { color: var(--gold); }
+.step.active .step-title { color: var(--text-dim); }
+.step-connector {
+  width: 28px; height: 2px; background: var(--border); margin: 0 -2px;
+  align-self: center; margin-bottom: 24px;
+}
+.step-connector.completed { background: var(--completed); }
+
+/* ------------------------------------------------------------------ */
+/* Overall progress bar                                                */
+/* ------------------------------------------------------------------ */
+.overall-bar {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px; margin-bottom: 24px;
+  display: flex; align-items: center; gap: 16px;
+}
+.overall-bar .label { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
+.overall-bar .track { flex: 1; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.overall-bar .fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--green), var(--cyan), var(--gold));
+  transition: width 0.6s ease;
+}
+.overall-bar .stat { font-size: 0.78rem; color: var(--text); white-space: nowrap; }
+
+/* ------------------------------------------------------------------ */
+/* Phase detail panels                                                 */
+/* ------------------------------------------------------------------ */
+.phases-container { display: flex; flex-direction: column; gap: 10px; }
+
+.phase-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  transition: border-color 0.2s;
+}
+.phase-panel:hover { border-color: var(--orange); }
+
+.phase-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; cursor: pointer; user-select: none;
+}
+.phase-header:hover { background: var(--surface-2); }
+
+.phase-icon {
+  width: 28px; height: 28px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700;
+  flex-shrink: 0;
+}
+.phase-icon.completed { background: var(--completed); color: #000; }
+.phase-icon.in_progress { background: var(--in-progress); color: #000; }
+.phase-icon.pending { background: var(--pending); color: var(--text-dim); }
+
+.phase-info { flex: 1; min-width: 0; }
+.phase-info .name { font-weight: 600; font-size: 0.95rem; }
+.phase-info .obj { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.phase-stats { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.phase-stats .mini-bar {
+  width: 100px; height: 5px; background: var(--surface-2);
+  border-radius: 3px; overflow: hidden;
+}
+.phase-stats .mini-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+.mini-fill.done { background: var(--completed); }
+.mini-fill.partial { background: var(--gold); }
+.phase-stats .pct { font-size: 0.72rem; color: var(--text-dim); width: 38px; text-align: right; }
+.phase-chevron { font-size: 0.7rem; color: var(--text-muted); transition: transform 0.3s; }
+.phase-panel.open .phase-chevron { transform: rotate(90deg); }
+
+/* Phase body */
+.phase-body { display: none; padding: 0 18px 18px; border-top: 1px solid var(--border); }
+.phase-panel.open .phase-body { display: block; }
+
+.phase-body-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding-top: 14px; }
+
+.phase-section h4 {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+
+/* Checklists */
+.checklist { list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.checklist li { font-size: 0.75rem; display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; }
+.checklist .mark { flex-shrink: 0; width: 16px; font-weight: 700; }
+.checklist .mark.done { color: var(--completed); }
+.checklist .mark.todo { color: var(--text-muted); }
+.checklist .item-text { color: var(--text-dim); }
+
+/* Capability tags */
+.cap-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.cap-tag {
+  font-size: 0.65rem; padding: 3px 9px; border-radius: 4px;
+  white-space: nowrap;
+}
+.cap-tag.skill { background: rgba(102,136,255,0.15); color: var(--blue); border: 1px solid rgba(102,136,255,0.3); }
+.cap-tag.agent { background: rgba(204,102,255,0.15); color: var(--magenta); border: 1px solid rgba(204,102,255,0.3); }
+.cap-tag.mcp { background: rgba(68,204,255,0.15); color: var(--cyan); border: 1px solid rgba(68,204,255,0.3); }
+.cap-tag.rule { background: rgba(255,179,71,0.1); color: var(--gold); border: 1px solid rgba(255,179,71,0.3); }
+.cap-tag.tool { background: rgba(68,204,102,0.1); color: var(--green); border: 1px solid rgba(68,204,102,0.3); }
+.cap-tag.hook { background: rgba(255,68,68,0.1); color: var(--red); border: 1px solid rgba(255,68,68,0.3); }
+
+.empty-state { color: var(--text-muted); font-size: 0.72rem; font-style: italic; }
+
+/* ------------------------------------------------------------------ */
+/* Capabilities overview at bottom                                     */
+/* ------------------------------------------------------------------ */
+.cap-overview {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px; margin-top: 20px;
+}
+.cap-overview h3 {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-dim); margin-bottom: 12px;
+}
+.cap-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.cap-count {
+  display: flex; align-items: center; gap: 8px; font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.cap-count .num { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+
+/* ------------------------------------------------------------------ */
+/* Footer                                                              */
+/* ------------------------------------------------------------------ */
+footer {
+  text-align: center; padding: 14px; font-size: 0.7rem;
+  color: var(--text-muted); border-top: 1px solid var(--border); margin-top: 24px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Loading                                                            */
+/* ------------------------------------------------------------------ */
+.loading { text-align: center; padding: 40px; color: var(--text-dim); }
+.loading::after { content: '...'; animation: dots 1.5s infinite; }
+@keyframes dots { 0%,20% { content: '.'; } 40% { content: '..'; } 60%,100% { content: '...'; } }
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+@media (max-width: 900px) {
+  .phase-body-inner { grid-template-columns: 1fr; }
+  .stepper { gap: 0; }
+  .step { min-width: 60px; }
+  .step-connector { width: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ================================================================= -->
+<!-- HEADER                                                             -->
+<!-- ================================================================= -->
+<header>
+  <div class="header-left">
+    <h1>🔥 AIDLC — AI Development Life Cycle</h1>
+  </div>
+  <div class="header-right">
+    <div class="progress-badge" id="header-progress">Loading...</div>
+    <a href="/ui" class="nav-link">📊 Monitoring Dashboard</a>
+  </div>
+</header>
+
+<main>
+
+<!-- Phase Stepper -->
+<div class="stepper" id="stepper"></div>
+
+<!-- Overall progress -->
+<div class="overall-bar" id="overall-bar">
+  <span class="label" style="display:flex;align-items:center;gap:6px;">📋 Phase Progress</span>
+</div>
+
+<!-- Phase detail panels -->
+<div class="phases-container" id="phases-container">
+  <div class="loading">Loading AIDLC data</div>
+</div>
+
+<!-- Capabilities overview -->
+<div class="cap-overview" id="cap-overview">
+  <h3>📊 Capabilities Overview</h3>
+  <div class="cap-grid" id="cap-grid"></div>
+</div>
+
+</main>
+
+<footer>AIDLC v0.1 · Data from docs/guides/plans/ · <span id="footer-stats"></span></footer>
+
+<!-- ================================================================= -->
+<!-- JAVASCRIPT                                                         -->
+<!-- ================================================================= -->
+<script>
+const API = '';
+let allPhases = [];
+let summary = {};
+let capOverview = {};
+let activePhase = null;
+
+// --------------------------------------------------------------------
+// Helpers
+// --------------------------------------------------------------------
+function $(id) { return document.getElementById(id); }
+function escHtml(s) {
+  if (!s) return '';
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(s));
+  return div.innerHTML;
+}
+
+function statusEmoji(s) {
+  if (s === 'completed') return '✅';
+  if (s === 'in_progress') return '🚧';
+  return '⬜';
+}
+
+// --------------------------------------------------------------------
+// Render
+// --------------------------------------------------------------------
+function renderStepper() {
+  const container = $('stepper');
+  container.innerHTML = allPhases.map((p, i) => {
+    const isActive = activePhase !== null && activePhase.number === p.number;
+    let connector = '';
+    if (i < allPhases.length - 1) {
+      const next = allPhases[i + 1];
+      const connClass = (p.status === 'completed' && next.status === 'completed') ? 'completed' : '';
+      connector = `<div class="step-connector ${connClass}"></div>`;
+    }
+    return `
+      <div class="step ${isActive ? 'active' : ''}" onclick="togglePhase(${p.number})" title="Phase ${p.number}: ${escHtml(p.subtitle)}">
+        <div class="step-dot ${p.status}">${p.number}</div>
+        <div class="step-label">${statusEmoji(p.status)}</div>
+        <div class="step-title">${escHtml(p.subtitle)}</div>
+      </div>
+      ${connector}
+    `;
+  }).join('');
+}
+
+function renderOverallBar() {
+  const s = summary;
+  const pct = s.overall_progress_pct || 0;
+  const container = $('overall-bar');
+  container.innerHTML = `
+    <span class="label">📋 Phase Progress</span>
+    <div class="track"><div class="fill" style="width:${pct}%"></div></div>
+    <span class="stat"><strong>${s.completed_phases}/${s.total_phases}</strong> phases · <strong>${s.completed_checklists}/${s.total_checklists}</strong> checks · <strong>${pct}%</strong></span>
+  `;
+  $('header-progress').innerHTML = `
+    <strong>${s.completed_phases}/${s.total_phases}</strong> phases complete · <strong>${pct}%</strong>
+  `;
+}
+
+function renderPhasePanels() {
+  const container = $('phases-container');
+  container.innerHTML = allPhases.map(p => {
+    const checked = p.completed_checks;
+    const total = p.total_checks;
+    const pct = p.progress_pct;
+    const fillClass = pct >= 100 ? 'done' : 'partial';
+    const openClass = (activePhase !== null && activePhase.number === p.number) ? ' open' : '';
+
+    return `
+      <div class="phase-panel${openClass}" id="phase-panel-${p.number}">
+        <div class="phase-header" onclick="togglePhase(${p.number})">
+          <div class="phase-icon ${p.status}">${p.number}</div>
+          <div class="phase-info">
+            <div class="name">Phase ${p.number}: ${escHtml(p.title)} <span style="font-size:0.7rem;color:var(--text-muted)">(${escHtml(p.subtitle)})</span></div>
+            <div class="obj">${escHtml(p.objective || 'No objective defined')}</div>
+          </div>
+          <div class="phase-stats">
+            ${total > 0 ? `
+              <div class="mini-bar"><div class="mini-fill ${fillClass}" style="width:${pct}%"></div></div>
+              <span class="pct">${checked}/${total}</span>
+            ` : `<span class="pct">${pct}%</span>`}
+            <span class="phase-chevron">▶</span>
+          </div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-body-inner">
+            <div class="phase-section">
+              <h4>📝 Checklists (${checked}/${total})</h4>
+              ${total > 0 ? `
+                <ul class="checklist">
+                  ${p.checklists.map(c => `
+                    <li>
+                      <span class="mark ${c.checked ? 'done' : 'todo'}">${c.checked ? '✓' : '○'}</span>
+                      <span class="item-text">${escHtml(c.text)}</span>
+                    </li>
+                  `).join('')}
+                </ul>
+              ` : '<div class="empty-state">No checklists defined</div>'}
+            </div>
+            <div class="phase-section">
+              <h4>🧩 Capabilities</h4>
+              ${renderCapTags(p.capabilities)}
+            </div>
+          </div>
+          ${p.outputs ? `<div style="margin-top:12px;font-size:0.7rem;color:var(--text-muted)">📦 Outputs: ${escHtml(p.outputs)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderCapTags(caps) {
+  const sections = [];
+  if (caps.skills && caps.skills.length) {
+    sections.push(`<div style="margin-bottom:6px"><span style="font-size:0.65rem;color:var(--text-muted)">🛡 Skills:</span> ${caps.skills.map(s => `<span class="cap-tag skill">${escHtml(s)}</span>`).join(' ')}</div>`);
+  }
+  if (caps.agents && caps.agents.length) {
+    sections.push(`<div style="margin-bottom:6px"><span style="font-size:0.65rem;color:var(--text-muted)">🤖 Agents:</span> ${caps.agents.map(a => `<span class="cap-tag agent">${escHtml(a)}</span>`).join(' ')}</div>`);
+  }
+  if (caps.mcp_tools && caps.mcp_tools.length) {
+    sections.push(`<div style="margin-bottom:6px"><span style="font-size:0.65rem;color:var(--text-muted)">🔌 MCP:</span> ${caps.mcp_tools.map(m => `<span class="cap-tag mcp">${escHtml(m)}</span>`).join(' ')}</div>`);
+  }
+  if (caps.tools && caps.tools.length) {
+    sections.push(`<div style="margin-bottom:6px"><span style="font-size:0.65rem;color:var(--text-muted)">🔧 Tools:</span> ${caps.tools.map(t => `<span class="cap-tag tool">${escHtml(t)}</span>`).join(' ')}</div>`);
+  }
+  if (caps.rules && caps.rules.length) {
+    sections.push(`<div style="margin-bottom:6px"><span style="font-size:0.65rem;color:var(--text-muted)">📋 Rules:</span> ${caps.rules.map(r => `<span class="cap-tag rule">${escHtml(r)}</span>`).join(' ')}</div>`);
+  }
+  if (caps.hooks && caps.hooks.length) {
+    sections.push(`<div style="margin-bottom:6px"><span style="font-size:0.65rem;color:var(--text-muted)">🪝 Hooks:</span> ${caps.hooks.map(h => `<span class="cap-tag hook">${escHtml(h)}</span>`).join(' ')}</div>`);
+  }
+  if (!sections.length) return '<div class="empty-state">No capabilities defined</div>';
+  return sections.join('');
+}
+
+function renderCapOverview() {
+  const co = capOverview;
+  $('cap-grid').innerHTML = `
+    <div class="cap-count"><span class="num">${co.total_skills || 0}</span> Skills</div>
+    <div class="cap-count"><span class="num">${co.total_agents || 0}</span> Agents</div>
+    <div class="cap-count"><span class="num">${co.total_mcp_tools || 0}</span> MCP Tools</div>
+    <div class="cap-count"><span class="num">${co.total_tools || 0}</span> Tools</div>
+    <div class="cap-count"><span class="num">${co.total_rules || 0}</span> Rules</div>
+    <div class="cap-count"><span class="num">${co.total_hooks || 0}</span> Hooks</div>
+  `;
+  $('footer-stats').textContent = `9 phases · ${co.total_skills || 0} skills · ${co.total_agents || 0} agents`;
+}
+
+function togglePhase(num) {
+  if (activePhase && activePhase.number === num) {
+    activePhase = null;
+  } else {
+    activePhase = allPhases.find(p => p.number === num) || null;
+  }
+  renderStepper();
+  renderPhasePanels();
+  // Scroll to panel
+  if (activePhase) {
+    setTimeout(() => {
+      const el = document.getElementById(`phase-panel-${num}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
+}
+
+// --------------------------------------------------------------------
+// Fetch & Init
+// --------------------------------------------------------------------
+async function init() {
+  try {
+    const res = await fetch(`${API}/aidlc`);
+    const data = await res.json();
+    allPhases = data.phases || [];
+    summary = data.summary || {};
+    capOverview = data.capabilities_overview || {};
+
+    renderStepper();
+    renderOverallBar();
+    renderPhasePanels();
+    renderCapOverview();
+  } catch (err) {
+    $('phases-container').innerHTML = `
+      <div style="text-align:center;padding:40px;color:var(--red)">
+        ⚠ Failed to load AIDLC data: ${escHtml(err.message)}
+        <br><br>
+        <span style="color:var(--text-dim)">Make sure the agent server is running and /aidlc endpoint is available.</span>
+      </div>`;
+    console.error('AIDLC load error:', err);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

@@ -21,6 +21,8 @@ class TestAgentMetricsDefaults:
         assert m.subagent_spawns == 0
         assert m.subagent_completes == 0
         assert m.total_tokens == 0
+        assert m.input_tokens == 0
+        assert m.output_tokens == 0
         assert m.total_tasks == 0
         assert m.completed_tasks == 0
 
@@ -59,6 +61,30 @@ class TestAgentMetricsRecording:
         m.record_model_call(500.0, success=True, tokens=42)
         assert m.model_calls == 1
         assert m.total_tokens == 42
+
+    def test_record_model_call_tracks_input_output_tokens(self) -> None:
+        m = AgentMetrics()
+        m.record_model_call(
+            500.0, success=True, input_tokens=30, output_tokens=12
+        )
+        assert m.model_calls == 1
+        assert m.total_tokens == 42
+        assert m.input_tokens == 30
+        assert m.output_tokens == 12
+
+    def test_record_model_call_prefers_input_output_over_tokens(self) -> None:
+        """When input+output are provided, they override the `tokens` param."""
+        m = AgentMetrics()
+        m.record_model_call(
+            500.0,
+            success=True,
+            tokens=99,
+            input_tokens=30,
+            output_tokens=12,
+        )
+        assert m.total_tokens == 42
+        assert m.input_tokens == 30
+        assert m.output_tokens == 12
 
     def test_record_model_call_failure(self) -> None:
         m = AgentMetrics()
@@ -190,6 +216,7 @@ class TestAgentMetricsDict:
             "tool_calls", "tool_errors", "model_calls", "model_errors",
             "tool_call_latency_ms", "llm_call_latency_ms",
             "subagent_spawn_count", "token_usage_total",
+            "input_tokens", "output_tokens",
             "summarization_triggers", "error_rate", "hitl_approval_rate",
             "task_completion_rate", "total_tasks", "completed_tasks",
             "avg_response_time_ms", "p50_tool_latency_ms",
@@ -214,13 +241,17 @@ class TestAgentMetricsReset:
     def test_reset_zeros_all_counters(self) -> None:
         m = AgentMetrics()
         m.record_tool_call("a", 100.0, success=True)
-        m.record_model_call(200.0, success=True, tokens=10)
+        m.record_model_call(
+            200.0, success=True, input_tokens=7, output_tokens=3
+        )
         m.record_subagent_spawn("x")
         m.record_task_complete(500.0)
         m.reset()
         assert m.tool_calls == 0
         assert m.model_calls == 0
         assert m.total_tokens == 0
+        assert m.input_tokens == 0
+        assert m.output_tokens == 0
         assert m.subagent_spawns == 0
         assert m.completed_tasks == 0
 

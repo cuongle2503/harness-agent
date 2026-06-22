@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live — Harness Agent</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════ */
+/* Reset & Theme — ERD-style professional light theme             */
+/* ═══════════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#f8f9fb;--surface:#fff;--border:#dde1e7;
+  --text:#1a1d26;--t2:#556270;--t3:#8b96a5;
+  --blue:#2563eb;--purple:#7c3aed;--cyan:#0891b2;
+  --green:#16a34a;--amber:#d97706;
+  --font:system-ui,-apple-system,'Segoe UI',sans-serif;
+  --radius:6px;
+  --shadow-card:0 1px 3px rgba(0,0,0,.08),0 0 0 1px rgba(0,0,0,.04);
+  --shadow-lg:0 8px 30px rgba(0,0,0,.10),0 0 0 1px rgba(0,0,0,.04);
+}
+
+html{font-size:15px}
+body{
+  font-family:var(--font);background:var(--bg);color:var(--text);
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 28px;border-bottom:1px solid var(--border);
+  background:var(--surface);flex-shrink:0;z-index:10;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand h1{font-size:1rem;font-weight:700;color:var(--text);letter-spacing:-.01em}
+.brand h1 em{font-style:normal;background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse-dot 2s infinite}
+nav{display:flex;gap:4px}
+nav a{color:var(--t2);text-decoration:none;font-size:.72rem;font-weight:500;padding:6px 14px;border-radius:var(--radius);transition:all .15s}
+nav a:hover{background:#f1f5f9;color:var(--text)}
+nav a.on{background:#eff6ff;color:var(--blue)}
+.stats{display:flex;gap:20px;font-size:.7rem;color:var(--t2)}
+.stats .stat{text-align:center}
+.stats .stat b{display:block;font-size:1.05rem;font-weight:700;color:var(--text)}
+.stats .stat span{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:var(--t3)}
+
+/* ── Diagram area ───────────────────────────────────────────── */
+#diagram{
+  flex:1;position:relative;overflow:hidden;
+  margin:14px 18px 10px;border-radius:8px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  box-shadow:var(--shadow-card);
+}
+
+/* Grid pattern */
+#diagram::before{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(#dde1e7 1px,transparent 1px);
+  background-size:32px 32px;
+  mask-image:linear-gradient(to bottom,transparent 0%,#000 8%,#000 92%,transparent 100%);
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 8%,#000 92%,transparent 100%);
+}
+
+/* SVG layer */
+#svg-layer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:visible}
+
+/* ── Node cards (ERD entity style) ──────────────────────────── */
+.node{
+  position:absolute;z-index:2;
+  min-width:140px;
+  background:var(--surface);
+  border:2px solid #e2e6ec;
+  border-radius:var(--radius);
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+  cursor:grab;user-select:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+.node:active{cursor:grabbing}
+.node.dragging{z-index:50;box-shadow:0 8px 32px rgba(0,0,0,.12);transition:none}
+.node .head{
+  display:flex;align-items:center;gap:7px;
+  padding:9px 14px;
+  font-size:.73rem;font-weight:700;
+  border-bottom:1px solid #eef0f4;
+  letter-spacing:-.01em;
+}
+.node .head .ico{font-size:.95rem;line-height:1}
+.node .body{padding:9px 14px;font-size:.68rem;color:var(--t2)}
+
+/* Entity type tag */
+.node .tag{
+  display:inline-block;font-size:.55rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;
+  padding:2px 7px;border-radius:3px;
+  background:#f1f5f9;color:var(--t3);
+}
+
+/* Color themes per node */
+.node.user  {border-color:#93c5fd} .node.user  .head{border-bottom-color:#dbeafe} .node.user  .head .ico{color:#2563eb}
+.node.sys   {border-color:#cbd5e1} .node.sys   .head{border-bottom-color:#e2e8f0} .node.sys   .head .ico{color:#64748b}
+.node.llm   {border-color:#c4b5fd} .node.llm   .head{border-bottom-color:#ede9fe} .node.llm   .head .ico{color:#7c3aed}
+.node.tools {border-color:#67e8f9} .node.tools .head{border-bottom-color:#cffafe} .node.tools .head .ico{color:#0891b2}
+.node.output{border-color:#fcd34d} .node.output.head{border-bottom-color:#fef3c7} .node.output.head .ico{color:#d97706}
+
+/* Active glow */
+.node.active{border-width:2px}
+.node.active.user  {border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.node.active.sys   {border-color:#64748b;box-shadow:0 0 0 3px rgba(100,116,139,.10)}
+.node.active.llm   {border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+.node.active.tools {border-color:#0891b2;box-shadow:0 0 0 3px rgba(8,145,178,.12)}
+.node.active.output{border-color:#d97706;box-shadow:0 0 0 3px rgba(217,119,6,.12)}
+
+/* Pulse indicator */
+.node .pulse{
+  position:absolute;top:-4px;right:-4px;
+  width:10px;height:10px;border-radius:50%;
+  border:2px solid #fff;opacity:0;transform:scale(.3);
+  transition:opacity .15s,transform .15s;
+}
+.node.pulsing .pulse{opacity:1;transform:scale(1)}
+.node.user .pulse{background:#2563eb}
+.node.llm .pulse{background:#7c3aed}
+.node.tools .pulse{background:#0891b2}
+.node.output .pulse{background:#d97706}
+.node.sys .pulse{background:#64748b}
+
+/* Latency inline */
+.node .latency{
+  font-size:.6rem;font-weight:600;color:var(--amber);
+  margin-left:6px;opacity:0;transition:opacity .2s;
+}
+.node .latency.show{opacity:1}
+
+/* ── Tool badges below Tools node ───────────────────────────── */
+#tool-badges{
+  position:absolute;z-index:3;
+  display:flex;gap:4px;flex-wrap:wrap;justify-content:center;
+}
+#tool-badges .tb{
+  font-size:.58rem;padding:2px 7px;border-radius:20px;
+  background:#f8fafc;color:#94a3b8;
+  border:1px solid #e2e8f0;
+  transition:all .2s;
+}
+#tool-badges .tb.hit{background:#ecfeff;color:#0891b2;border-color:#67e8f9;font-weight:600}
+
+/* ── Toast ──────────────────────────────────────────────────── */
+.toast{
+  position:fixed;top:62px;left:50%;transform:translateX(-50%);
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:8px 20px;font-size:.73rem;
+  color:var(--text);opacity:0;transition:all .2s;
+  pointer-events:none;z-index:20;box-shadow:var(--shadow-lg);
+  font-weight:500;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(3px)}
+
+/* ── Tooltip ────────────────────────────────────────────────── */
+.tip{
+  position:fixed;pointer-events:none;opacity:0;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:11px 15px;font-size:.7rem;z-index:25;
+  transition:opacity .15s;max-width:280px;box-shadow:var(--shadow-lg);
+}
+.tip.on{opacity:1}
+.tip .tn{font-weight:700;margin-bottom:4px;font-size:.75rem;color:var(--text)}
+.tip .tr{color:var(--t2);font-size:.65rem;line-height:1.5}
+
+/* ── Footer ─────────────────────────────────────────────────── */
+footer{
+  text-align:center;padding:6px;font-size:.62rem;color:var(--t3);
+  border-top:1px solid var(--border);flex-shrink:0;background:var(--surface);
+}
+
+/* ── Edge labels ───────────────────────────────────────────── */
+.edge-lbl{text-shadow:0 0 4px #fff,0 0 4px #fff}
+
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1><em>Harness Agent</em> · Live Workflow</h1>
+    <div class="dot"></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="st-ev">0</b><span>Events</span></div>
+    <div class="stat"><b id="st-turns">0</b><span>Turns</span></div>
+    <div class="stat"><b id="st-tools">0</b><span>Tools</span></div>
+  </div>
+  <nav>
+    <a href="/ui">Dashboard</a>
+    <a href="/ui/aidlc">AIDLC</a>
+    <a href="/ui/activity" class="on">Live</a>
+  </nav>
+</header>
+
+<div id="diagram">
+  <svg id="svg-layer"></svg>
+
+  <!-- User -->
+  <div class="node user" id="nd-user">
+    <div class="head"><span class="ico">👤</span>User</div>
+    <div class="body"><span class="tag">input</span> messages</div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- System Prompt -->
+  <div class="node sys" id="nd-sys">
+    <div class="head"><span class="ico">📋</span>System Prompt</div>
+    <div class="body"><span class="tag">system</span> instructions</div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- LLM -->
+  <div class="node llm" id="nd-llm">
+    <div class="head"><span class="ico">🧠</span>DeepSeek V4</div>
+    <div class="body"><span class="tag">orchestrator</span> reason + decide<span class="latency" id="lat-llm"></span></div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- Tools -->
+  <div class="node tools" id="nd-tools">
+    <div class="head"><span class="ico">🔧</span>Tools</div>
+    <div class="body"><span class="tag">toolbox</span> 7 tools<span class="latency" id="lat-tools"></span></div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- Output -->
+  <div class="node output" id="nd-output">
+    <div class="head"><span class="ico">📤</span>Response</div>
+    <div class="body"><span class="tag">output</span> final answer<span class="latency" id="lat-output"></span></div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- Tool badges -->
+  <div id="tool-badges"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="tip" id="tip"></div>
+
+<footer>Agent workflow — events flow through the system in real time</footer>
+
+<script>
+const API = '';
+
+// ═════════════════════════════════════════════════════════════
+// NODE DEFINITIONS
+// ═════════════════════════════════════════════════════════════
+const NODES = [
+  { id:'user',   el:'nd-user',   xPct:3,  yPct:22 },
+  { id:'sys',    el:'nd-sys',    xPct:3,  yPct:68 },
+  { id:'llm',    el:'nd-llm',    xPct:33, yPct:18 },
+  { id:'tools',  el:'nd-tools',  xPct:33, yPct:66 },
+  { id:'output', el:'nd-output', xPct:67, yPct:22 },
+];
+
+// Edges — offset prevents overlapping bidirectional lines
+const EDGES = [
+  { from:'user',   to:'llm',    label:'input',     off:0 },
+  { from:'sys',    to:'llm',    label:'prompt',    off:0 },
+  { from:'llm',    to:'tools',  label:'tool call', off:-26 },
+  { from:'tools',  to:'llm',    label:'result',    off:26 },
+  { from:'llm',    to:'output', label:'response',  off:0 },
+  { from:'output', to:'user',   label:'reply',     off:0 },
+];
+
+// Start with server's BASIC_TOOLS — new tools auto-added on first use
+const KNOWN_TOOLS = ['read_file','write_file','edit_file','glob','grep','execute_command'];
+let toolBadgeEls = {};
+
+// ═════════════════════════════════════════════════════════════
+// LAYOUT
+// ═════════════════════════════════════════════════════════════
+const diagram = document.getElementById('diagram');
+const svg = document.getElementById('svg-layer');
+const toolBadges = document.getElementById('tool-badges');
+
+// Build tool badges from known list
+KNOWN_TOOLS.forEach(t => renderToolBadge(t));
+
+function renderToolBadge(t) {
+  if (toolBadgeEls[t]) return;
+  const b = document.createElement('span');
+  b.className = 'tb'; b.dataset.tool = t; b.textContent = t.replace(/_/g,' ');
+  toolBadges.appendChild(b);
+  toolBadgeEls[t] = b;
+}
+
+function elCenter(el) {
+  const dr = diagram.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  return {
+    cx: r.left - dr.left + r.width/2,
+    cy: r.top - dr.top + r.height/2,
+    top: r.top - dr.top,
+    left: r.left - dr.left,
+    w: r.width, h: r.height,
+    right: r.left - dr.left + r.width,
+    bottom: r.top - dr.top + r.height,
+  };
+}
+
+function layout() {
+  const W = diagram.clientWidth;
+  const H = diagram.clientHeight;
+
+  NODES.forEach(n => {
+    const el = document.getElementById(n.el);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const nw = r.width, nh = r.height;
+    const left = n.xPct/100 * W - nw/2;
+    const top = n.yPct/100 * H - nh/2;
+    el.style.left = Math.max(6, Math.min(W - nw - 6, left)) + 'px';
+    el.style.top = Math.max(6, Math.min(H - nh - 6, top)) + 'px';
+  });
+
+  // Position tool badges below tools node
+  const toolsEl = document.getElementById('nd-tools');
+  const tc = elCenter(toolsEl);
+  toolBadges.style.left = tc.cx + 'px';
+  toolBadges.style.top = (tc.bottom + 8) + 'px';
+  toolBadges.style.transform = 'translateX(-50%)';
+
+  drawEdges();
+}
+
+// ═════════════════════════════════════════════════════════════
+// DRAW CONNECTIONS — straight lines, clean & simple
+// ═════════════════════════════════════════════════════════════
+const COLORS = {user:'#2563eb',sys:'#64748b',llm:'#7c3aed',tools:'#0891b2',output:'#d97706'};
+
+function pickPorts(f, t) {
+  // Pick best exit (from) and entry (to) ports for a straight line
+  const dx = t.cx - f.cx;
+  const dy = t.cy - f.cy;
+
+  let x1, y1, x2, y2;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    // Horizontal dominant
+    if (dx > 0) { x1 = f.right; x2 = t.left; }
+    else        { x1 = f.left;  x2 = t.right; }
+    y1 = f.cy; y2 = t.cy;
+  } else {
+    // Vertical dominant
+    if (dy > 0) { y1 = f.bottom; y2 = t.top; }
+    else        { y1 = f.top;    y2 = t.bottom; }
+    x1 = f.cx; x2 = t.cx;
+  }
+  return {x1, y1, x2, y2};
+}
+
+function drawEdges() {
+  const W = diagram.clientWidth;
+  const H = diagram.clientHeight;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.style.width = W+'px'; svg.style.height = H+'px';
+
+  let defs = '', lines = '', labels = '';
+  let markerId = 0;
+
+  EDGES.forEach(e => {
+    const fe = document.getElementById('nd-'+e.from);
+    const te = document.getElementById('nd-'+e.to);
+    if (!fe || !te) return;
+
+    const f = elCenter(fe);
+    const t = elCenter(te);
+    const c = COLORS[e.from];
+    let x1, y1, x2, y2;
+
+    if (e.off !== 0) {
+      // Bidirectional: use opposite sides so lines are parallel & distinct
+      // off < 0 → right side; off > 0 → left side
+      const side = e.off < 0 ? 1 : -1;
+      const gap = Math.abs(e.off);
+      // Exit/enter based on direction: from→to
+      if (f.cy < t.cy) {
+        // Downward: exit bottom of from, enter top of to
+        x1 = f.cx + side * gap; y1 = f.bottom;
+        x2 = t.cx + side * gap; y2 = t.top;
+      } else {
+        // Upward: exit top of from, enter bottom of to
+        x1 = f.cx + side * gap; y1 = f.top;
+        x2 = t.cx + side * gap; y2 = t.bottom;
+      }
+    } else {
+      ({x1, y1, x2, y2} = pickPorts(f, t));
+    }
+
+    const mid = markerId++;
+    defs += `
+      <marker id="m${mid}" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="${c}" opacity="0.55"/>
+      </marker>`;
+
+    lines += `
+      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+            stroke="${c}" stroke-width="2.5" stroke-linecap="round"
+            opacity="0.55" marker-end="url(#m${mid})"/>`;
+
+    // Label at midpoint, offset perpendicular
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    // For bidirectional: push label further out on same side
+    const lox = e.off !== 0 ? -Math.sin(angle) * (e.off < 0 ? -22 : 22)
+                            : -Math.sin(angle) * 12;
+    const loy = e.off !== 0 ? Math.cos(angle) * 0
+                            : Math.cos(angle) * 12;
+    labels += `<text x="${mx + lox}" y="${my + loy}" fill="#64748b" font-size="10" font-weight="600"
+                     text-anchor="middle" dominant-baseline="middle"
+                     font-family="system-ui,sans-serif" letter-spacing="0.04em" pointer-events="none"
+                     class="edge-lbl">${e.label}</text>`;
+  });
+
+  svg.innerHTML = `<defs>${defs}</defs>${lines}${labels}`;
+}
+
+window.addEventListener('resize', layout);
+
+// ═════════════════════════════════════════════════════════════
+// DRAG — nodes only
+// ═════════════════════════════════════════════════════════════
+let dragNode = null;
+let dragStartX = 0, dragStartY = 0;
+let dragOrigLeft = 0, dragOrigTop = 0;
+
+document.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  const node = e.target.closest('.node');
+  if (!node) return;
+  dragNode = node;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragOrigLeft = parseFloat(node.style.left) || 0;
+  dragOrigTop = parseFloat(node.style.top) || 0;
+  node.classList.add('dragging');
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', e => {
+  if (!dragNode) return;
+  const dx = e.clientX - dragStartX;
+  const dy = e.clientY - dragStartY;
+  const W = diagram.clientWidth;
+  const H = diagram.clientHeight;
+  const nw = dragNode.offsetWidth;
+  const nh = dragNode.offsetHeight;
+  dragNode.style.left = Math.max(4, Math.min(W - nw - 4, dragOrigLeft + dx)) + 'px';
+  dragNode.style.top = Math.max(4, Math.min(H - nh - 4, dragOrigTop + dy)) + 'px';
+  drawEdges();
+  if (dragNode.id === 'nd-tools') {
+    const tc = elCenter(dragNode);
+    toolBadges.style.left = tc.cx + 'px';
+    toolBadges.style.top = (tc.bottom + 8) + 'px';
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (!dragNode) return;
+  dragNode.classList.remove('dragging');
+  dragNode = null;
+  drawEdges();
+});
+// ═════════════════════════════════════════════════════════════
+const pCanvas = document.createElement('canvas');
+pCanvas.style.cssText = 'position:absolute;inset:0;z-index:1;pointer-events:none';
+diagram.appendChild(pCanvas);
+const pctx = pCanvas.getContext('2d');
+
+function resizePCanvas() { pCanvas.width = diagram.clientWidth; pCanvas.height = diagram.clientHeight; }
+resizePCanvas();
+window.addEventListener('resize', resizePCanvas);
+
+let particles = [];
+
+function spawn(fromId, toId) {
+  const fe = document.getElementById('nd-'+fromId);
+  const te = document.getElementById('nd-'+toId);
+  if (!fe || !te) return;
+  const f = elCenter(fe);
+  const t = elCenter(te);
+  const c = COLORS[fromId];
+  const edge = EDGES.find(e => e.from === fromId && e.to === toId);
+
+  let sx, sy, ex, ey;
+  if (edge && edge.off !== 0) {
+    const side = edge.off < 0 ? 1 : -1;
+    const gap = Math.abs(edge.off);
+    if (f.cy < t.cy) {
+      sx = f.cx + side * gap; sy = f.bottom;
+      ex = t.cx + side * gap; ey = t.top;
+    } else {
+      sx = f.cx + side * gap; sy = f.top;
+      ex = t.cx + side * gap; ey = t.bottom;
+    }
+  } else {
+    ({x1:sx, y1:sy, x2:ex, y2:ey} = pickPorts(f, t));
+  }
+
+  particles.push({ sx, sy, ex, ey, t:0, speed:0.008 + Math.random()*0.007, c });
+}
+
+function animateParticles(ts) {
+  pctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  particles = particles.filter(p => {
+    p.t += p.speed;
+    if (p.t >= 1) return false;
+    const t = p.t;
+    // Straight line interpolation
+    const px = p.sx + (p.ex - p.sx) * t;
+    const py = p.sy + (p.ey - p.sy) * t;
+    const alpha = t < 0.10 ? t/0.10 : (t > 0.75 ? (1-t)/0.25 : 1);
+    pctx.beginPath();
+    pctx.arc(px, py, 2.8, 0, Math.PI*2);
+    pctx.fillStyle = p.c;
+    pctx.globalAlpha = alpha * 0.85;
+    pctx.fill();
+    pctx.globalAlpha = 1;
+    return true;
+  });
+  if (particles.length > 80) particles = particles.slice(-50);
+  requestAnimationFrame(animateParticles);
+}
+requestAnimationFrame(animateParticles);
+
+// ═════════════════════════════════════════════════════════════
+// ACTIVITY STATE
+// ═════════════════════════════════════════════════════════════
+let active = {}; let stats = { ev:0, turns:0, tools:0 };
+let glowTimers = {};
+
+function activate(id, strength) {
+  if (!active[id]) active[id] = { toolCalls:{} };
+  const el = document.getElementById('nd-'+id);
+  if (!el) return;
+  el.classList.add('active','pulsing');
+  if (glowTimers[id]) clearTimeout(glowTimers[id]);
+  glowTimers[id] = setTimeout(() => {
+    el.classList.remove('active','pulsing');
+  }, Math.max(500, strength * 1400));
+}
+
+function pulse(id) {
+  const el = document.getElementById('nd-'+id);
+  if (!el) return;
+  el.classList.add('active','pulsing');
+  if (glowTimers[id]) clearTimeout(glowTimers[id]);
+  glowTimers[id] = setTimeout(() => el.classList.remove('active','pulsing'), 900);
+}
+
+function showLatency(id, ms) {
+  if (ms === undefined) return;
+  const el = document.getElementById('lat-'+id);
+  if (!el) return;
+  el.textContent = ms.toFixed(0)+'ms';
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ═════════════════════════════════════════════════════════════
+// HOVER TOOLTIP
+// ═════════════════════════════════════════════════════════════
+const tip = document.getElementById('tip');
+document.querySelectorAll('.node').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    const id = el.id.replace('nd-','');
+    const st = active[id] || {};
+    let h = `<div class="tn">${el.querySelector('.head').childNodes[1]?.textContent||id}</div>`;
+    h += `<div class="tr">${el.querySelector('.body').textContent.trim()}</div>`;
+    if (st.lastInput) h += `<div class="tr">last: ${esc(st.lastInput.substring(0,55))}</div>`;
+    if (st.lastLatency !== undefined) h += `<div class="tr">latency: ${st.lastLatency.toFixed(1)}ms</div>`;
+    tip.innerHTML = h; tip.classList.add('on');
+  });
+  el.addEventListener('mouseleave', () => tip.classList.remove('on'));
+  el.addEventListener('mousemove', e => {
+    tip.style.left = Math.min(e.clientX+14, window.innerWidth-290)+'px';
+    tip.style.top = (e.clientY+8)+'px';
+  });
+});
+
+// ═════════════════════════════════════════════════════════════
+// DATA POLLING
+// ═════════════════════════════════════════════════════════════
+let seen = new Set();
+async function poll() {
+  try {
+    const res = await fetch(`${API}/activity?count=40`);
+    const fresh = (await res.json()).filter(e => {
+      const k = `${e.type}-${e.time}`;
+      if (seen.has(k)) return false; seen.add(k); return true;
+    });
+    for (const e of fresh) process(e);
+    document.getElementById('st-ev').textContent = stats.ev;
+    document.getElementById('st-turns').textContent = stats.turns;
+    document.getElementById('st-tools').textContent = stats.tools;
+  } catch(e){}
+}
+
+function process(e) {
+  stats.ev++;
+  switch (e.type) {
+    case 'user_msg':
+      activate('user', 0.8);
+      spawn('user', 'llm');
+      toast(`💬 ${(e.content||'').substring(0,80)}`);
+      break;
+    case 'llm_start':
+      activate('llm', 1);
+      activate('sys', 0.4);
+      spawn('sys', 'llm');
+      toast('🧠 LLM reasoning…');
+      break;
+    case 'tool_start':
+      activate('tools', 1);
+      spawn('llm', 'tools');
+      if (!active['tools']) active['tools'] = { toolCalls:{} };
+      if (!active['tools'].toolCalls) active['tools'].toolCalls = {};
+      const tn = e.name || '?';
+      active['tools'].toolCalls[tn] = (active['tools'].toolCalls[tn]||0) + 1;
+      active['tools'].lastTool = tn;
+      active['tools'].lastInput = e.input || '';
+      // Auto-add unknown tools on first use
+	if (!toolBadgeEls[tn]) renderToolBadge(tn);
+	updateBadges(tn);
+      stats.tools++;
+      toast(`🔧 ${tn}(${(e.input||'').substring(0,50)})`);
+      break;
+    case 'tool_end':
+      pulse('tools');
+      spawn('tools', 'llm');     // tool result → back to LLM
+      if (!active['tools']) active['tools'] = { toolCalls:{} };
+      active['tools'].lastLatency = e.latency_ms || 0;
+      showLatency('tools', e.latency_ms);
+      break;
+    case 'turn_end':
+      stats.turns++;
+      activate('output', 1);
+      spawn('llm', 'output');    // LLM final → response
+      spawn('output', 'user');   // response → user
+      showLatency('output', e.latency_ms);
+      toast(`📤 ${e.tokens||0} tokens · ${e.tool_calls||0} tool calls · ${(e.latency_ms||0).toFixed(0)}ms`);
+      break;
+  }
+}
+
+const badgeTimers = {};
+function updateBadges(toolName) {
+  const b = toolBadgeEls[toolName];
+  if (!b) return;
+  b.classList.add('hit');
+  // Auto-fade back to gray after 3s
+  clearTimeout(badgeTimers[toolName]);
+  badgeTimers[toolName] = setTimeout(() => b.classList.remove('hit'), 3000);
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(s));
+  return d.innerHTML;
+}
+
+// ═════════════════════════════════════════════════════════════
+// INIT
+// ═════════════════════════════════════════════════════════════
+const PAGE_LOAD_TIME = Date.now() / 1000;
+
+async function init() {
+  layout();
+  await poll();
+  resetAllBadges();
+  setInterval(poll, 1000);
+  document.fonts.ready.then(() => layout());
+}
+
+function resetAllBadges() {
+  Object.values(toolBadgeEls).forEach(b => b.classList.remove('hit'));
+  Object.values(badgeTimers).forEach(clearTimeout);
+  if (active['tools']) active['tools'].toolCalls = {};
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

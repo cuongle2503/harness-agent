@@ -28,8 +28,9 @@ from langchain_core.messages import (
 from langchain_core.runnables import RunnableConfig
 
 from harness_agent.config import AgentModelSelection
-from harness_agent.core.agent import HarnessAgent
+from harness_agent.core.agent import DEFAULT_MAX_TOOL_ITERATIONS, HarnessAgent
 from harness_agent.memory.hybrid_memory import HybridMemory
+from harness_agent.monitoring.metrics import AgentMetrics
 from harness_agent.prompts import load_prompt
 from harness_agent.security.sandbox import SandboxConfig
 
@@ -605,6 +606,7 @@ class CLIAgentConfig:
     ])
     enable_memory: bool = True
     enable_skills: bool = True
+    monitoring_port: int = 2025
     sandbox_type: str = "docker"
     cwd: str = field(default_factory=os.getcwd)
     mcp_servers: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -629,6 +631,9 @@ class CLIAgent:
         self._sandbox = self._init_sandbox()
         self._agent = self._init_agent()
         self._memory = HybridMemory()
+        self._metrics = AgentMetrics()
+        self._start_time = time.monotonic()
+        self._metrics_server = self._start_metrics_http_server()
         self._init_debug_mode()
 
     def _init_llm(self) -> BaseChatModel:
@@ -672,6 +677,40 @@ class CLIAgent:
             system_prompt=system_prompt,
             max_tool_iterations=self.config.max_tool_iterations,
         )
+
+    def _start_metrics_http_server(self) -> Any:
+        """Start a background HTTP server for the monitoring dashboard.
+
+        Uses stdlib http.server in a daemon thread — no extra dependencies.
+        The dashboard polls this server for live metrics while the CLI runs.
+        """
+        from harness_agent.deployment.cli_metrics_server import (
+            start_metrics_server,
+        )
+
+        port = self.config.monitoring_port
+        env_port = os.environ.get("HARNESS_MONITORING_PORT")
+        if env_port:
+            try:
+                port = int(env_port)
+            except ValueError:
+                pass
+
+        try:
+            return start_metrics_server(
+                metrics=self._metrics,
+                start_time=self._start_time,
+                memory=self._memory,
+                port=port,
+                agent_id=self.config.assistant_id,
+                sandbox_type=self.config.sandbox_type,
+            )
+        except OSError as e:
+            # Port in use or permission denied — warn and continue
+            print(f"\n  {Color.warn(f'⚠ Dashboard server: {e}')}")
+            print(f"  {Color.dim('Metrics and UI unavailable this session.')}")
+            print(f"  {Color.dim('Set HARNESS_MONITORING_PORT to change port.')}")
+            return None
 
     async def _stream_turn(
         self, messages: list, config: RunnableConfig
@@ -845,6 +884,11 @@ class CLIAgent:
 
                 elapsed_ms = (time.perf_counter() - t0) * 1000
 
+                # Record tool call metrics for the monitoring dashboard
+                self._metrics.record_tool_call(
+                    tool_name, elapsed_ms, success=not error
+                )
+
                 # Draw the bottom half with result and timing
                 _draw_tool_box_bottom(
                     box_w, result=msg, elapsed_ms=elapsed_ms, error=error
@@ -921,9 +965,15 @@ class CLIAgent:
                 HumanMessage(content=user_input),
             ]
 
+            self._metrics.record_task_start()
+            turn_start = time.perf_counter()
+
             text_response, updated_msgs = await self._stream_turn(
                 messages, config
             )
+
+            turn_elapsed_ms = (time.perf_counter() - turn_start) * 1000
+            self._metrics.record_task_complete(turn_elapsed_ms)
 
             if text_response is None and updated_msgs:
                 # Try to extract text from last AI message
@@ -1112,6 +1162,11 @@ class CLIAgent:
         ))
         info = f"Memory: {mem}  ·  {tools_n} tools  ·  model: {model}"
         print(_box_line(Color.muted(info), dim=True))
+        if self._metrics_server is not None:
+            dash_url = f"http://localhost:{self.config.monitoring_port}/ui"
+            print(_box_line(
+                f"Dashboard: {Color.paint(dash_url, Color.CYAN, Color.UNDERLINE)}"
+            ))
         if history:
             print(_box_line(
                 Color.muted(f"Restored {hist_n} messages from previous session"),

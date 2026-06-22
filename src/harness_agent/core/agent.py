@@ -41,8 +41,15 @@ class HarnessAgent(Runnable[dict[str, Any], dict[str, Any]]):
         self.system_prompt = system_prompt
         self.max_tool_iterations = max_tool_iterations
 
-    def _execute_tools(self, tool_calls: list[dict[str, Any]]) -> list[ToolMessage]:
-        """Execute a list of tool calls and return ToolMessages."""
+    def _execute_tools(
+        self, tool_calls: list[dict[str, Any]],
+        config: RunnableConfig | None = None,
+    ) -> list[ToolMessage]:
+        """Execute a list of tool calls and return ToolMessages.
+
+        Passes config through so callbacks (e.g., metrics recording)
+        receive on_tool_start / on_tool_end events.
+        """
         results: list[ToolMessage] = []
         for tc in tool_calls:
             tool_name = tc.get("name", "")
@@ -53,7 +60,7 @@ class HarnessAgent(Runnable[dict[str, Any], dict[str, Any]]):
                 msg = f"Unknown tool: {tool_name}"
             else:
                 try:
-                    result = tool.invoke(tool_args)
+                    result = tool.invoke(tool_args, config)
                     msg = str(result)
                 except Exception as e:
                     msg = f"Tool error: {e}"
@@ -82,7 +89,7 @@ class HarnessAgent(Runnable[dict[str, Any], dict[str, Any]]):
                 return {"messages": messages}
 
             # Execute tools and append results
-            tool_msgs = self._execute_tools(tool_calls)
+            tool_msgs = self._execute_tools(tool_calls, config)
             messages.extend(tool_msgs)
 
         # Max iterations reached
@@ -111,7 +118,7 @@ class HarnessAgent(Runnable[dict[str, Any], dict[str, Any]]):
             if not tool_calls:
                 return {"messages": messages}
 
-            tool_msgs = self._execute_tools(tool_calls)
+            tool_msgs = self._execute_tools(tool_calls, config)
             messages.extend(tool_msgs)
 
         logger.warning(

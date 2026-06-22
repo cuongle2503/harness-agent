@@ -212,3 +212,32 @@ class TestLoggingOutput:
         result = await mw.awrap_tool_call(Req(), handler)
         assert result == "async ok"
         assert metrics.tool_calls == 1
+
+
+# ── /sessions endpoint ────────────────────────────────────────────────────────
+
+
+class TestSessionsEndpoint:
+    """Tests for GET /sessions."""
+
+    def test_sessions_endpoint_returns_200(self, client: TestClient) -> None:
+        response = client.get("/sessions")
+        assert response.status_code == 200
+
+    def test_sessions_endpoint_returns_list(self, client: TestClient) -> None:
+        response = client.get("/sessions")
+        data = response.json()
+        assert isinstance(data, list)
+
+    def test_sessions_starts_empty(self, client: TestClient) -> None:
+        """Before any agent invocations, session list should be empty."""
+        response = client.get("/sessions")
+        data = response.json()
+        assert data == []
+
+    def test_sessions_endpoint_valid_json(self, client: TestClient) -> None:
+        """Sessions data is valid JSON with correct schema when empty."""
+        response = client.get("/sessions")
+        data = response.json()
+        assert isinstance(data, list)
+        assert response.headers["content-type"] == "application/json"

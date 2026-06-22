@@ -148,9 +148,13 @@ class StructuredLoggingMiddleware(AgentMiddleware):
         try:
             result = handler(request)
             elapsed = (time.monotonic() - start) * 1000
-            tokens = self._extract_tokens(result)
+            tokens_total, tokens_in, tokens_out = self._extract_tokens(result)
             self.metrics.record_model_call(
-                elapsed, success=True, tokens=tokens
+                elapsed,
+                success=True,
+                tokens=tokens_total,
+                input_tokens=tokens_in,
+                output_tokens=tokens_out,
             )
             self._emit(
                 LogEvent(
@@ -159,7 +163,12 @@ class StructuredLoggingMiddleware(AgentMiddleware):
                     thread_id=thread_id,
                     duration_ms=round(elapsed, 2),
                     status="success",
-                    metadata={"model": model, "tokens": tokens},
+                    metadata={
+                        "model": model,
+                        "tokens": tokens_total,
+                        "input_tokens": tokens_in,
+                        "output_tokens": tokens_out,
+                    },
                 )
             )
             return result
@@ -233,9 +242,13 @@ class StructuredLoggingMiddleware(AgentMiddleware):
         try:
             result = await handler(request)
             elapsed = (time.monotonic() - start) * 1000
-            tokens = self._extract_tokens(result)
+            tokens_total, tokens_in, tokens_out = self._extract_tokens(result)
             self.metrics.record_model_call(
-                elapsed, success=True, tokens=tokens
+                elapsed,
+                success=True,
+                tokens=tokens_total,
+                input_tokens=tokens_in,
+                output_tokens=tokens_out,
             )
             self._emit(
                 LogEvent(
@@ -244,7 +257,12 @@ class StructuredLoggingMiddleware(AgentMiddleware):
                     thread_id=thread_id,
                     duration_ms=round(elapsed, 2),
                     status="success",
-                    metadata={"model": model, "tokens": tokens},
+                    metadata={
+                        "model": model,
+                        "tokens": tokens_total,
+                        "input_tokens": tokens_in,
+                        "output_tokens": tokens_out,
+                    },
                 )
             )
             return result
@@ -433,17 +451,24 @@ class StructuredLoggingMiddleware(AgentMiddleware):
         return "unknown"
 
     @staticmethod
-    def _extract_tokens(result: Any) -> int:
-        """Extract token count from a model result.
+    def _extract_tokens(result: Any) -> tuple[int, int, int]:
+        """Extract token counts from a model result.
 
-        Looks for ``usage_metadata["total_tokens"]``.
+        Returns (total_tokens, input_tokens, output_tokens).
         """
+        total = 0
+        inp = 0
+        out = 0
+        um: dict[str, Any] = {}
         if hasattr(result, "usage_metadata"):
-            um = result.usage_metadata
-            if isinstance(um, dict):
-                return int(um.get("total_tokens", 0))
-        if isinstance(result, dict):
+            um = result.usage_metadata or {}
+        elif isinstance(result, dict):
             um = result.get("usage_metadata", {})
-            if isinstance(um, dict):
-                return int(um.get("total_tokens", 0))
-        return 0
+        if isinstance(um, dict):
+            total = int(um.get("total_tokens", 0))
+            inp = int(um.get("input_tokens", 0))
+            out = int(um.get("output_tokens", 0))
+            # Fallback: compute total from input+output if total isn't set
+            if not total and (inp or out):
+                total = inp + out
+        return total, inp, out

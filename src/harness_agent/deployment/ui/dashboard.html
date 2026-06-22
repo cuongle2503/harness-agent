@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harness Agent — AIDLC Dashboard</title>
+<style>
+/* ------------------------------------------------------------------ */
+/* Reset & Base — dark flame theme                                     */
+/* ------------------------------------------------------------------ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d0d0f;
+  --surface:   #16161a;
+  --surface-2: #1e1e24;
+  --border:    #2a2a35;
+  --text:      #e0e0e0;
+  --text-dim:  #888896;
+  --text-muted:#5c5c6e;
+  --orange:    #ff8c42;
+  --gold:      #ffb347;
+  --red:       #ff4444;
+  --green:     #44cc66;
+  --cyan:      #44ccff;
+  --blue:      #6688ff;
+  --magenta:   #cc66ff;
+  --radius:    8px;
+  --font:      'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+html { font-size: 14px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ------------------------------------------------------------------ */
+/* Header                                                              */
+/* ------------------------------------------------------------------ */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-left h1 {
+  font-size: 1.25rem; font-weight: 700;
+  background: linear-gradient(90deg, var(--red), var(--orange), var(--gold));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.status-dot {
+  width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+  animation: pulse 2s infinite;
+}
+.status-dot.healthy { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.status-dot.degraded { background: var(--gold); box-shadow: 0 0 8px var(--gold)); }
+.status-dot.down { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.5; }
+}
+
+.header-right { display: flex; align-items: center; gap: 20px; font-size: 0.85rem; color: var(--text-dim); }
+.header-right span { display: flex; align-items: center; gap: 6px; }
+.refresh-indicator { color: var(--cyan); font-size: 0.75rem; }
+
+/* ------------------------------------------------------------------ */
+/* Layout                                                              */
+/* ------------------------------------------------------------------ */
+main { padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; max-width: 1400px; margin: 0 auto; }
+
+/* Metric grid: 5 columns top row, 3 columns bottom row */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+.metrics-grid-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Metric Card                                                         */
+/* ------------------------------------------------------------------ */
+.metric-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+  transition: border-color 0.3s;
+}
+.metric-card:hover { border-color: var(--orange); }
+.metric-card .label {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); font-weight: 600;
+}
+.metric-card .value {
+  font-size: 1.8rem; font-weight: 700; color: var(--text);
+}
+.metric-card .sub {
+  font-size: 0.78rem; color: var(--text-dim); display: flex; gap: 12px; flex-wrap: wrap;
+}
+.metric-card .bar-group { display: flex; flex-direction: column; gap: 4px; }
+.metric-card .bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
+.metric-card .bar-row .bar-label { width: 32px; color: var(--text-dim); text-align: right; }
+.metric-card .bar-row .bar-track { flex: 1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.metric-card .bar-row .bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+.bar-fill.p50 { background: var(--green); }
+.bar-fill.p95 { background: var(--gold); }
+.bar-fill.p99 { background: var(--red); }
+
+.gauge-ring {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: conic-gradient(var(--red) var(--pct, 0%), var(--surface-2) var(--pct, 0%));
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto;
+}
+.gauge-ring::after {
+  content: ''; width: 48px; height: 48px; border-radius: 50%;
+  background: var(--surface); position: absolute;
+}
+.gauge-value { font-size: 0.9rem; font-weight: 700; z-index: 1; }
+
+.sparkline { display: flex; align-items: flex-end; gap: 2px; height: 32px; }
+.sparkline .dot { width: 4px; background: var(--orange); border-radius: 2px; min-height: 2px; transition: height 0.5s; }
+
+.cost-badge {
+  font-size: 0.78rem; color: var(--gold); font-weight: 600;
+}
+
+.approval-bar {
+  height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden;
+}
+.approval-bar .fill {
+  height: 100%; background: linear-gradient(90deg, var(--green), var(--cyan));
+  border-radius: 4px; transition: width 0.5s;
+}
+
+/* ------------------------------------------------------------------ */
+/* Bottom panels: Tool Feed + Chat                                     */
+/* ------------------------------------------------------------------ */
+.bottom-panels {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px; min-height: 340px;
+}
+
+.panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden;
+}
+.panel-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-dim); font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.panel-header .dot { width: 8px; height: 8px; border-radius: 50%; }
+.panel-header .dot.live { background: var(--green); animation: pulse 1.5s infinite; }
+
+.panel-body { flex: 1; overflow-y: auto; padding: 8px 12px; }
+
+/* Tool feed */
+#tool-feed { font-size: 0.78rem; }
+.tool-entry {
+  padding: 6px 8px; border-left: 2px solid var(--border);
+  margin-bottom: 4px; border-radius: 0 4px 4px 0;
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.tool-entry.success { border-left-color: var(--green); }
+.tool-entry.error { border-left-color: var(--red); }
+.tool-entry .tool-name { color: var(--cyan); font-weight: 600; }
+.tool-entry .tool-args { color: var(--text-dim); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-entry .tool-time { color: var(--text-muted); font-size: 0.7rem; white-space: nowrap; }
+.tool-placeholder { color: var(--text-muted); font-style: italic; padding: 20px; text-align: center; }
+
+/* Chat */
+#chat-messages { display: flex; flex-direction: column; gap: 10px; }
+.chat-msg { padding: 8px 12px; border-radius: var(--radius); max-width: 90%; font-size: 0.82rem; }
+.chat-msg.user { align-self: flex-end; background: var(--orange); color: #000; }
+.chat-msg.assistant { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--border); }
+.chat-msg .meta { font-size: 0.65rem; color: inherit; opacity: 0.6; margin-bottom: 4px; }
+
+.chat-input-row { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
+.chat-input-row input {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); padding: 10px 14px;
+  font-family: var(--font); font-size: 0.85rem; outline: none;
+  transition: border-color 0.2s;
+}
+.chat-input-row input:focus { border-color: var(--orange); }
+.chat-input-row button {
+  background: var(--orange); color: #000; border: none;
+  border-radius: var(--radius); padding: 10px 18px;
+  font-family: var(--font); font-weight: 700; font-size: 0.82rem;
+  cursor: pointer; transition: background 0.2s;
+}
+.chat-input-row button:hover { background: var(--gold); }
+.chat-input-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ------------------------------------------------------------------ */
+/* Footer                                                              */
+/* ------------------------------------------------------------------ */
+footer {
+  text-align: center; padding: 12px; font-size: 0.7rem;
+  color: var(--text-muted); border-top: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+@media (max-width: 1100px) {
+  .metrics-grid { grid-template-columns: repeat(3, 1fr); }
+  .bottom-panels { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .metrics-grid-bottom { grid-template-columns: 1fr; }
+  main { padding: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ================================================================= -->
+<!-- HEADER                                                             -->
+<!-- ================================================================= -->
+<header>
+  <div class="header-left">
+    <span class="status-dot healthy" id="status-dot"></span>
+    <h1>🔥 Harness Agent — AIDLC Dashboard</h1>
+    <span style="font-size:0.72rem;color:var(--text-muted);" id="status-text">healthy</span>
+  </div>
+  <div class="header-right">
+    <span>⏱ Uptime: <strong id="uptime">--</strong></span>
+    <span>🔄 Refresh: <strong>2s</strong></span>
+    <span class="refresh-indicator" id="refresh-dot">●</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ================================================================= -->
+<!-- METRICS ROW 1 — 5 panels                                           -->
+<!-- ================================================================= -->
+<div class="metrics-grid">
+
+  <!-- Panel 1: Agent Status -->
+  <div class="metric-card">
+    <div class="label">🤖 Agent Status</div>
+    <div class="value" id="panel-status">--</div>
+    <div class="sub">Agent ID: <span id="panel-agent-id">--</span></div>
+  </div>
+
+  <!-- Panel 2: Request Rate -->
+  <div class="metric-card">
+    <div class="label">📊 Request Rate</div>
+    <div class="value" id="panel-req-rate">--</div>
+    <div class="sub">tasks: <span id="panel-tasks">0/0</span></div>
+    <div class="sparkline" id="sparkline-req"></div>
+  </div>
+
+  <!-- Panel 3: Error Rate -->
+  <div class="metric-card">
+    <div class="label">⚠ Error Rate</div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div class="gauge-ring" id="error-gauge" style="--pct:0%;position:relative;">
+        <span class="gauge-value" id="panel-error-rate" style="position:relative;z-index:1;">0%</span>
+      </div>
+      <div class="sub" style="flex-direction:column;">
+        <span>Tool err: <span id="panel-tool-err">0</span></span>
+        <span>Model err: <span id="panel-model-err">0</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 4: Latency -->
+  <div class="metric-card">
+    <div class="label">⏱ Latency</div>
+    <div class="bar-group">
+      <div class="bar-row"><span class="bar-label">P50</span><div class="bar-track"><div class="bar-fill p50" id="bar-p50" style="width:0%"></div></div><span id="val-p50">--</span></div>
+      <div class="bar-row"><span class="bar-label">P95</span><div class="bar-track"><div class="bar-fill p95" id="bar-p95" style="width:0%"></div></div><span id="val-p95">--</span></div>
+      <div class="bar-row"><span class="bar-label">P99</span><div class="bar-track"><div class="bar-fill p99" id="bar-p99" style="width:0%"></div></div><span id="val-p99">--</span></div>
+    </div>
+    <div class="sub">Avg: <span id="panel-avg-resp">--</span></div>
+  </div>
+
+  <!-- Panel 5: Token Usage & API -->
+  <div class="metric-card">
+    <div class="label">🪙 Token Usage &amp; API</div>
+    <div class="value" id="panel-tokens">--</div>
+    <div style="display:flex;flex-direction:column;gap:4px;font-size:0.78rem;">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <span style="color:var(--cyan);">⬇ In: <strong id="panel-input-tokens">0</strong></span>
+        <span style="color:var(--magenta);">⬆ Out: <strong id="panel-output-tokens">0</strong></span>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <span>Total: <strong id="panel-total-tokens">0</strong></span>
+        <span class="cost-badge" id="panel-cost">$0.00</span>
+        <span style="color:var(--text-dim);">📞 API: <strong id="panel-api-calls">0</strong></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================================= -->
+<!-- METRICS ROW 2 — 3 panels                                           -->
+<!-- ================================================================= -->
+<div class="metrics-grid-bottom">
+
+  <!-- Panel 6: Subagent Activity -->
+  <div class="metric-card">
+    <div class="label">🧩 Subagent Activity</div>
+    <div class="value" id="panel-subagent-spawns">0</div>
+    <div class="sub">
+      <span>Spawns/min: <span id="panel-subagent-rate">0</span></span>
+      <span>Completed: <span id="panel-subagent-done">0</span></span>
+    </div>
+  </div>
+
+  <!-- Panel 7: HITL Status -->
+  <div class="metric-card">
+    <div class="label">🛡 HITL Status</div>
+    <div class="value" id="panel-hitl-rate">100%</div>
+    <div class="sub">Approvals: <span id="panel-hitl-approvals">0</span> / Rejections: <span id="panel-hitl-rejections">0</span></div>
+    <div class="approval-bar"><div class="fill" id="hitl-bar" style="width:100%"></div></div>
+  </div>
+
+  <!-- Panel 8: Memory Usage -->
+  <div class="metric-card">
+    <div class="label">💾 Memory Usage</div>
+    <div class="value" id="panel-memory">--</div>
+    <div class="sub">items stored</div>
+  </div>
+
+</div>
+
+<!-- ================================================================= -->
+<!-- SESSIONS PANEL: Per-thread breakdown                                -->
+<!-- ================================================================= -->
+<div class="panel" style="margin-bottom:4px;">
+  <div class="panel-header">
+    <span class="dot live"></span> 📋 Sessions — Per‑Thread Token &amp; API Usage
+  </div>
+  <div class="panel-body" id="sessions-body" style="max-height:300px;overflow-y:auto;padding:0;">
+    <table style="width:100%;border-collapse:collapse;font-size:0.78rem;" id="sessions-table">
+      <thead>
+        <tr style="color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em;font-size:0.7rem;border-bottom:1px solid var(--border);">
+          <th style="padding:8px 12px;text-align:left;">Thread ID</th>
+          <th style="padding:8px 12px;text-align:right;">⬇ Input</th>
+          <th style="padding:8px 12px;text-align:right;">⬆ Output</th>
+          <th style="padding:8px 12px;text-align:right;">📞 API</th>
+          <th style="padding:8px 12px;text-align:right;">🔧 Tools</th>
+          <th style="padding:8px 12px;text-align:right;">🔄 Turns</th>
+        </tr>
+      </thead>
+      <tbody id="sessions-tbody">
+        <tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-muted);">No sessions yet — send a message to start</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- BOTTOM PANELS: Tool Feed + Chat                                    -->
+<!-- ================================================================= -->
+<div class="bottom-panels">
+
+  <!-- Tool Call Feed -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot live"></span> Tool Call Feed
+    </div>
+    <div class="panel-body" id="tool-feed">
+      <div class="tool-placeholder">Waiting for agent activity...</div>
+    </div>
+  </div>
+
+  <!-- Chat Panel -->
+  <div class="panel">
+    <div class="panel-header">💬 Chat with Agent</div>
+    <div class="panel-body" id="chat-messages">
+      <div class="chat-msg assistant">
+        <div class="meta">Harness Agent</div>
+        <div>Hello! I'm ready. Ask me anything or give me a task. I have file tools, search, shell commands, and more.</div>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Type a message..." autofocus
+             onkeydown="if(event.key==='Enter')sendMessage()">
+      <button id="chat-send" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+</div>
+
+</main>
+
+<footer>
+  AIDLC Dashboard v0.1 · Phase 7 Monitoring · Auto-refresh every 2s
+</footer>
+
+<!-- ================================================================= -->
+<!-- JAVASCRIPT                                                         -->
+<!-- ================================================================= -->
+<script>
+// --------------------------------------------------------------------
+// State
+// --------------------------------------------------------------------
+const API = '';
+const POLL_INTERVAL = 2000;
+let pollTimer = null;
+let sparklineHistory = new Array(30).fill(0);
+
+// --------------------------------------------------------------------
+// Helpers
+// --------------------------------------------------------------------
+function $(id) { return document.getElementById(id); }
+
+function formatMs(ms) {
+  if (ms === undefined || ms === null) return '--';
+  return (ms < 1000) ? `${ms.toFixed(0)}ms` : `${(ms/1000).toFixed(1)}s`;
+}
+
+function formatUptime(sec) {
+  if (!sec || sec <= 0) return '--';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function formatTokens(n) {
+  if (n >= 1_000_000) return `${(n/1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n/1_000).toFixed(1)}K`;
+  return `${n}`;
+}
+
+// --------------------------------------------------------------------
+// Sparkline
+// --------------------------------------------------------------------
+function updateSparkline(value) {
+  sparklineHistory.push(value);
+  if (sparklineHistory.length > 30) sparklineHistory.shift();
+  const max = Math.max(...sparklineHistory, 1);
+  const container = $('sparkline-req');
+  container.innerHTML = sparklineHistory.map(v => {
+    const h = Math.max(2, (v / max) * 32);
+    return `<div class="dot" style="height:${h}px"></div>`;
+  }).join('');
+}
+
+// --------------------------------------------------------------------
+// Tool feed
+// --------------------------------------------------------------------
+function renderToolFeed(entries) {
+  const container = $('tool-feed');
+  if (!entries || entries.length === 0) {
+    container.innerHTML = '<div class="tool-placeholder">Waiting for agent activity...</div>';
+    return;
+  }
+  container.innerHTML = entries.map(e =>
+    `<div class="tool-entry ${e.success ? 'success' : 'error'}">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="tool-name">${escHtml(e.name)}</span>
+          <span class="tool-time">${formatMs(e.latency_ms)}</span>
+        </div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">in: ${escHtml(e.input || '')}</div>
+        <div style="font-size:0.68rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">out: ${escHtml(e.output || '')}</div>
+      </div>
+      ${e.success
+        ? '<span style="color:var(--green);font-size:0.7rem">✓</span>'
+        : '<span style="color:var(--red);font-size:0.7rem">✗</span>'}
+    </div>`
+  ).join('');
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(s));
+  return div.innerHTML;
+}
+
+// --------------------------------------------------------------------
+// Sessions table
+// --------------------------------------------------------------------
+function shortenThreadId(id) {
+  if (!id) return '—';
+  return id.length > 16 ? id.slice(0, 8) + '...' + id.slice(-4) : id;
+}
+
+function renderSessions(sessions) {
+  const tbody = $('sessions-tbody');
+  if (!sessions || sessions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-muted);">No sessions yet — send a message to start</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sessions.map((s, i) => {
+    const bg = i % 2 === 0 ? 'transparent' : 'var(--surface-2)';
+    return `<tr style="background:${bg};border-bottom:1px solid var(--border);">
+      <td style="padding:8px 12px;font-family:var(--font);" title="${escHtml(s.thread_id)}">${escHtml(shortenThreadId(s.thread_id))}</td>
+      <td style="padding:8px 12px;text-align:right;color:var(--cyan);">${formatTokens(s.input_tokens ?? 0)}</td>
+      <td style="padding:8px 12px;text-align:right;color:var(--magenta);">${formatTokens(s.output_tokens ?? 0)}</td>
+      <td style="padding:8px 12px;text-align:right;color:var(--gold);">${s.api_calls ?? 0}</td>
+      <td style="padding:8px 12px;text-align:right;color:var(--text-dim);">${s.tool_calls ?? 0}</td>
+      <td style="padding:8px 12px;text-align:right;color:var(--text-dim);">${s.turns ?? 0}</td>
+    </tr>`;
+  }).join('');
+}
+
+// --------------------------------------------------------------------
+// Poll & Render
+// --------------------------------------------------------------------
+async function poll() {
+  try {
+    const [dashRes, metricsRes, healthRes, toolRes, sessionsRes] = await Promise.all([
+      fetch(`${API}/dashboard`),
+      fetch(`${API}/metrics`),
+      fetch(`${API}/health`).catch(() => null),
+      fetch(`${API}/tool-history`).catch(() => null),
+      fetch(`${API}/sessions`).catch(() => null),
+    ]);
+
+    const dash = await dashRes.json();
+    const metrics = await metricsRes.json();
+    const health = healthRes ? await healthRes.json() : null;
+    const tools = toolRes ? await toolRes.json() : [];
+    const sessions = sessionsRes ? await sessionsRes.json() : [];
+
+    renderDashboard(dash, metrics, health);
+    renderToolFeed(tools);
+    renderSessions(sessions);
+  } catch (err) {
+    console.error('Poll error:', err);
+  } finally {
+    $('refresh-dot').textContent = '●';
+    setTimeout(() => { $('refresh-dot').textContent = '○'; }, 300);
+  }
+}
+
+function renderDashboard(dash, metrics, health) {
+  // --- Panel 1: Agent Status ---
+  const status = dash.agent_status || 'healthy';
+  $('panel-status').textContent = status.toUpperCase();
+  $('panel-agent-id').textContent = health?.agent_id || 'harness-agent';
+  const dot = $('status-dot');
+  dot.className = 'status-dot ' + status;
+  $('status-text').textContent = status;
+
+  // --- Panel 2: Request Rate ---
+  const reqRate = dash.request_rate_per_minute ?? 0;
+  $('panel-req-rate').textContent = `${reqRate.toFixed(1)}/min`;
+  $('panel-tasks').textContent = `${metrics.completed_tasks ?? 0}/${metrics.total_tasks ?? 0}`;
+  updateSparkline(reqRate);
+
+  // --- Panel 3: Error Rate ---
+  const errRate = (dash.error_rate ?? 0) * 100;
+  $('error-gauge').style.setProperty('--pct', `${errRate}%`);
+  $('panel-error-rate').textContent = `${errRate.toFixed(1)}%`;
+  $('panel-tool-err').textContent = metrics.tool_errors ?? 0;
+  $('panel-model-err').textContent = metrics.model_errors ?? 0;
+
+  // --- Panel 4: Latency ---
+  const p50 = dash.latency_p50_ms ?? 0;
+  const p95 = dash.latency_p95_ms ?? 0;
+  const p99 = dash.latency_p99_ms ?? 0;
+  const maxLat = Math.max(p50, p95, p99, 1);
+  $('bar-p50').style.width = `${(p50/maxLat)*100}%`;
+  $('bar-p95').style.width = `${(p95/maxLat)*100}%`;
+  $('bar-p99').style.width = `${(p99/maxLat)*100}%`;
+  $('val-p50').textContent = formatMs(p50);
+  $('val-p95').textContent = formatMs(p95);
+  $('val-p99').textContent = formatMs(p99);
+  $('panel-avg-resp').textContent = formatMs(dash.avg_response_time_ms);
+
+  // --- Panel 5: Token Usage & API ---
+  const tokRate = dash.token_usage_per_minute ?? 0;
+  $('panel-tokens').textContent = `${formatTokens(Math.round(tokRate))}/min`;
+  $('panel-input-tokens').textContent = formatTokens(metrics.input_tokens ?? 0);
+  $('panel-output-tokens').textContent = formatTokens(metrics.output_tokens ?? 0);
+  $('panel-total-tokens').textContent = formatTokens(metrics.token_usage_total ?? 0);
+  $('panel-api-calls').textContent = formatTokens(metrics.model_calls ?? 0);
+  const cost = dash.estimated_cost_usd ?? 0;
+  $('panel-cost').textContent = `$${cost.toFixed(6)}`;
+
+  // --- Panel 6: Subagent Activity ---
+  $('panel-subagent-spawns').textContent = metrics.subagent_spawn_count ?? 0;
+  $('panel-subagent-rate').textContent = (dash.subagent_spawns_per_minute ?? 0).toFixed(1);
+  $('panel-subagent-done').textContent = metrics.subagent_completes ?? 0;
+
+  // --- Panel 7: HITL Status ---
+  const hitlRate = (dash.hitl_approval_rate ?? 1) * 100;
+  $('panel-hitl-rate').textContent = `${hitlRate.toFixed(0)}%`;
+  $('panel-hitl-approvals').textContent = metrics.hitl_approvals ?? 0;
+  $('panel-hitl-rejections').textContent = metrics.hitl_rejections ?? 0;
+  $('hitl-bar').style.width = `${hitlRate}%`;
+
+  // --- Panel 8: Memory Usage ---
+  $('panel-memory').textContent = dash.memory_items ?? '--';
+
+  // --- Uptime ---
+  $('uptime').textContent = formatUptime(dash.uptime_seconds);
+}
+
+// --------------------------------------------------------------------
+// Chat
+// --------------------------------------------------------------------
+let threadId = 'dashboard-' + Date.now();
+
+async function sendMessage() {
+  const input = $('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  const btn = $('chat-send');
+  btn.disabled = true;
+  input.disabled = true;
+
+  // Show user message
+  appendChat('user', 'You', msg);
+
+  try {
+    const res = await fetch(`${API}/agent/invoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: msg }],
+        thread_id: threadId,
+      }),
+    });
+    const data = await res.json();
+    appendChat('assistant', `Agent (${data.tokens_used || 0} tokens)`, data.content || '(no response)');
+  } catch (err) {
+    appendChat('assistant', 'Error', `Failed to reach agent: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    input.disabled = false;
+    input.value = '';
+    input.focus();
+  }
+}
+
+function appendChat(role, sender, text) {
+  const msgs = $('chat-messages');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  div.innerHTML = `<div class="meta">${escHtml(sender)}</div><div>${escHtml(text)}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// --------------------------------------------------------------------
+// Init
+// --------------------------------------------------------------------
+function start() {
+  poll(); // immediate first poll
+  pollTimer = setInterval(poll, POLL_INTERVAL);
+}
+
+document.addEventListener('DOMContentLoaded', start);
+</script>
+
+</body>
+</html>

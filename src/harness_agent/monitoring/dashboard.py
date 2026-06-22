@@ -37,6 +37,8 @@ class MetricsResponse(BaseModel):
         ..., description="Total subagents spawned"
     )
     token_usage_total: int = Field(..., description="Cumulative token usage")
+    input_tokens: int = Field(..., description="Total input/prompt tokens")
+    output_tokens: int = Field(..., description="Total output/completion tokens")
     summarization_triggers: int = Field(
         ..., description="Total summarization triggers"
     )
