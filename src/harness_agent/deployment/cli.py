@@ -777,15 +777,16 @@ class CLIAgent:
             session_id = f"{self.config.assistant_id}-{os.getpid()}"
 
         # Check if an aggregator is already running on this port
-        # Retry a few times — the server daemon thread may not be ready yet
+        # Retry — the server daemon thread may not be ready yet
         aggregator_alive = False
-        for _ in range(3):
+        for attempt in range(5):
             try:
                 _ur.urlopen(f"http://127.0.0.1:{port}/health", timeout=1)
                 aggregator_alive = True
                 break
             except Exception:
-                time.sleep(0.3)
+                if attempt < 4:
+                    time.sleep(0.5)
 
         if aggregator_alive:
             # --- CLIENT MODE ---
@@ -846,9 +847,35 @@ class CLIAgent:
                 print(f"  {Color.dim(msg2)}")
                 return server
             except OSError as e:
-                print(f"\n  {Color.warn(f'⚠ Dashboard server: {e}')}")
-                print(f"  {Color.dim('Metrics and UI unavailable this session.')}")
-                return None
+                # Port likely in use by another aggregator — try client mode
+                print(f"\n  {Color.dim(f'Port {port} in use, trying client mode...')}")
+                try:
+                    body = json.dumps({
+                        "session_id": session_id,
+                        "name": name,
+                        "agent_id": self.config.assistant_id,
+                        "pid": os.getpid(),
+                    }).encode("utf-8")
+                    req = _ur.Request(
+                        f"http://127.0.0.1:{port}/register",
+                        data=body,
+                        headers={"Content-Type": "application/json"},
+                    )
+                    resp = json.loads(_ur.urlopen(req, timeout=2).read())
+                    actual_sid = resp.get("session_id", session_id)
+                    self._session_id = actual_sid
+                    self._bridge = _MetricsBridge(actual_sid, http_port=port)
+                    print(f"  {Color.success('📊 Dashboard:')} "
+                          f"{Color.paint(f'http://127.0.0.1:{port}/ui', Color.CYAN)}")
+                    msg = f'connected to existing aggregator as "{actual_sid}"'
+                    print(f"  {Color.dim(msg)}")
+                    import atexit as _ae2
+                    _ae2.register(self._unregister_from_aggregator)
+                    return None
+                except Exception as e2:
+                    print(f"  {Color.warn(f'⚠ Dashboard unavailable: {e2}')}")
+                    print(f"  {Color.dim('Metrics and UI unavailable this session.')}")
+                    return None
 
     def _unregister_from_aggregator(self) -> None:
         """Notify aggregator that this session is gone (client mode)."""
