@@ -530,14 +530,14 @@ def start_metrics_server(
     _MetricsHandler.sandbox_type = sandbox_type
     _MetricsHandler.session_id = sid
 
-    # Register this host session and use the caller's metrics instance
+    host = os.environ.get("HARNESS_MONITORING_HOST", "127.0.0.1")
+    server = HTTPServer((host, port), _MetricsHandler)
+
+    # Register AFTER successful bind (don't register if port is taken)
     register_session(sid, name, agent_id)
     with _sessions_lock:
         _sessions[sid]["metrics"] = metrics
     atexit.register(unregister_session, sid)
-
-    host = os.environ.get("HARNESS_MONITORING_HOST", "127.0.0.1")
-    server = HTTPServer((host, port), _MetricsHandler)
 
     thread = threading.Thread(
         target=server.serve_forever,
