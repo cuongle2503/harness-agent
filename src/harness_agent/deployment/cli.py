@@ -816,6 +816,7 @@ class CLIAgent:
             return server
         except OSError:
             # Port in use — aggregator exists but health check missed it
+            print(f"\n  {Color.dim(f'Port {port} in use, trying client mode...')}")
             result = self._try_client_mode(port, session_id, name)
             if result is not None:
                 return result
@@ -853,6 +854,7 @@ class CLIAgent:
             _ae.register(self._unregister_from_aggregator)
             return None  # client mode, no server to manage
         except Exception as e:
+            print(f"\n  {Color.warn(f'⚠ Client mode failed: {e}')}")
             return None  # signal failure to caller
 
     def _unregister_from_aggregator(self) -> None:
