@@ -401,6 +401,11 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         name = body.get("name", sid)
         agent_id = body.get("agent_id", sid)
         pid = body.get("pid", 0)
+        # If session_id already taken by another process, make it unique
+        with _sessions_lock:
+            existing = _sessions.get(sid)
+            if existing and existing.get("pid") != pid:
+                sid = f"{sid}-{pid}"
         register_session(sid, name, agent_id, pid=pid)
         self._send_json({"session_id": sid, "status": "registered"})
 

@@ -804,10 +804,16 @@ class CLIAgent:
                     data=body,
                     headers={"Content-Type": "application/json"},
                 )
-                _ur.urlopen(req, timeout=2)
+                resp = json.loads(_ur.urlopen(req, timeout=2).read())
+                actual_sid = resp.get("session_id", session_id)
+                if actual_sid != session_id:
+                    self._session_id = actual_sid
+                    self._bridge = _MetricsBridge(actual_sid, http_port=port)
+                    note = f'session_id "{session_id}" taken, using "{actual_sid}"'
+                    print(f"\n  {Color.dim(note)}")
                 print(f"\n  {Color.success('📊 Dashboard:')} "
                       f"{Color.paint(f'http://127.0.0.1:{port}/ui', Color.CYAN)}")
-                msg = f'connected to existing aggregator as "{session_id}"'
+                msg = f'connected to existing aggregator as "{actual_sid}"'
                 print(f"  {Color.dim(msg)}")
                 # Register cleanup on exit
                 import atexit as _ae
