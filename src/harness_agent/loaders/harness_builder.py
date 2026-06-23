@@ -231,6 +231,16 @@ class HarnessBuilder:
         rule_sources = self.rule_loader.get_memory_sources()
         skill_sources = self.skill_loader.get_memory_sources()
 
+        # Convert absolute paths to backend-relative paths.
+        # create_deep_agent expects POSIX paths relative to the backend's
+        # root_dir. When using FilesystemBackend, this maps to the project_root.
+        _rel = lambda p: str(Path(p).resolve().relative_to(self.project_root))
+        rule_sources = [_rel(p) for p in rule_sources]
+        # SkillsMiddleware expects directory paths, not individual files.
+        # It scans directories for *.md skill files.
+        skill_dirs = sorted({str(Path(p).parent) for p in skill_sources})
+        skill_sources = [_rel(d) for d in skill_dirs]
+
         # Step 6: Resolve models — use pre-created models if provided
         main_model = model or self._resolve_model(self.config.model)
         sum_model = summarization_model or self._resolve_model(
