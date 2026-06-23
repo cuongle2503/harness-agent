@@ -236,10 +236,9 @@ class HarnessBuilder:
         # root_dir. When using FilesystemBackend, this maps to the project_root.
         _rel = lambda p: str(Path(p).resolve().relative_to(self.project_root))
         rule_sources = [_rel(p) for p in rule_sources]
-        # SkillsMiddleware expects directory paths, not individual files.
-        # It scans directories for *.md skill files.
-        skill_dirs = sorted({str(Path(p).parent) for p in skill_sources})
-        skill_sources = [_rel(d) for d in skill_dirs]
+        # Skill sources are directory paths (Agent Skills spec).
+        # SkillsMiddleware scans them for */SKILL.md files.
+        skill_sources = [_rel(p) for p in skill_sources]
 
         # Step 6: Resolve models — use pre-created models if provided
         main_model = model or self._resolve_model(self.config.model)

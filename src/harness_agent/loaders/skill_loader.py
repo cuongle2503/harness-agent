@@ -85,6 +85,34 @@ def _extract_skill_metadata(content: str) -> tuple[str, str]:
     return name, description
 
 
+def _extract_yaml_frontmatter(content: str) -> tuple[str, str]:
+    """Extract name and description from YAML frontmatter (Agent Skills spec).
+
+    Looks for ``---`` delimited YAML at the start of the file with
+    ``name:`` and ``description:`` keys.
+
+    Returns (name, description). Both may be empty strings.
+    """
+    name = ""
+    description = ""
+    # Match YAML frontmatter between --- delimiters
+    m = re.match(r"^---\s*\n(.*?)\n---", content, re.DOTALL)
+    if not m:
+        return name, description
+    frontmatter = m.group(1)
+    # Extract name
+    name_match = re.search(r"^name:\s*(.+)", frontmatter, re.MULTILINE)
+    if name_match:
+        name = name_match.group(1).strip().strip('"').strip("'")
+    # Extract description
+    desc_match = re.search(
+        r"^description:\s*(.+)", frontmatter, re.MULTILINE
+    )
+    if desc_match:
+        description = desc_match.group(1).strip().strip('"').strip("'")
+    return name, description
+
+
 class SkillLoader:
     """Scan .harness/skills/*.md and provide paths for MemoryMiddleware.
 
@@ -118,28 +146,41 @@ class SkillLoader:
         return self.skills_dir.is_dir()
 
     def get_memory_sources(self) -> list[str]:
-        """Return absolute paths of all skill markdown files.
+        """Return absolute paths of all skill directories.
 
-        These paths are designed to be passed directly to
-        ``MemoryMiddleware(sources=[...])``.
+        Skills follow the Agent Skills specification:
+        each skill lives in its own subdirectory containing a
+        ``SKILL.md`` file (e.g. ``skills/code-review/SKILL.md``).
+
+        Returns the **directory** paths so ``create_deep_agent``
+        and ``SkillsMiddleware`` can scan them for skill files.
 
         Returns:
-            List of absolute paths as strings. Empty list if the
-            skills directory does not exist or contains no .md files.
+            List of absolute directory paths as strings. Empty list
+            if the skills directory does not exist or contains no
+            skill subdirectories.
         """
         if not self.exists:
             return []
-        return sorted(
-            str(p.resolve()) for p in self.skills_dir.glob("*.md")
-        )
+        # Return directories that contain a SKILL.md file
+        skill_dirs: list[str] = []
+        for skill_md in sorted(self.skills_dir.glob("*/SKILL.md")):
+            skill_dirs.append(str(skill_md.parent.resolve()))
+        # Fallback: also support flat *.md files for backward compatibility
+        if not skill_dirs:
+            for p in sorted(self.skills_dir.glob("*.md")):
+                skill_dirs.append(str(p.resolve()))
+        return skill_dirs
 
     def list_skills(self) -> list[SkillInfo]:
         """List information about all registered skills.
 
-        Parses each skill file to extract the name (first ``# Heading``)
-        and description (first paragraph after the heading). These are
-        used for progressive disclosure — the LLM sees name + description
-        at all times, and the full body is loaded when the task matches.
+        Follows the Agent Skills specification: skills live in
+        subdirectories as ``<name>/SKILL.md`` with YAML frontmatter
+        containing ``name`` and ``description``.
+
+        Falls back to flat ``*.md`` files with heading-based metadata
+        extraction for backward compatibility.
 
         Returns:
             List of SkillInfo with name, path, size, and description.
@@ -148,18 +189,42 @@ class SkillLoader:
         if not self.exists:
             return []
         result: list[SkillInfo] = []
-        for p in sorted(self.skills_dir.glob("*.md")):
+
+        # Primary: scan */SKILL.md (Agent Skills spec)
+        for skill_md in sorted(self.skills_dir.glob("*/SKILL.md")):
             try:
-                content = p.read_text(encoding="utf-8")
+                content = skill_md.read_text(encoding="utf-8")
                 name, description = _extract_skill_metadata(content)
+                # YAML frontmatter takes priority for name
+                fm_name, fm_desc = _extract_yaml_frontmatter(content)
+                name = fm_name or name
+                description = fm_desc or description
             except Exception:
                 name, description = "", ""
             result.append(
                 SkillInfo(
-                    name=name or p.stem.replace("-", " ").title(),
-                    path=str(p.resolve()),
-                    size=p.stat().st_size,
+                    name=name or skill_md.parent.name.replace("-", " ").title(),
+                    path=str(skill_md.resolve()),
+                    size=skill_md.stat().st_size,
                     description=description,
                 )
             )
+
+        # Fallback: flat *.md files (backward compatibility)
+        if not result:
+            for p in sorted(self.skills_dir.glob("*.md")):
+                try:
+                    content = p.read_text(encoding="utf-8")
+                    name, description = _extract_skill_metadata(content)
+                except Exception:
+                    name, description = "", ""
+                result.append(
+                    SkillInfo(
+                        name=name or p.stem.replace("-", " ").title(),
+                        path=str(p.resolve()),
+                        size=p.stat().st_size,
+                        description=description,
+                    )
+                )
+
         return result
