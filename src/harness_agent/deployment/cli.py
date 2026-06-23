@@ -1435,9 +1435,16 @@ class CLIAgent:
 
                         # Record to activity feed
                         if self._bridge:
+                            # Filter out non-serializable runtime objects
+                            safe_input = {
+                                k: v for k, v in tool_input.items()
+                                if k != "runtime"
+                            } if isinstance(tool_input, dict) else {}
                             self._bridge.tool_history(
                                 name=tool_name,
-                                input_str=json.dumps(tool_input)
+                                input_str=json.dumps(
+                                    safe_input, default=str, ensure_ascii=False
+                                )
                                 if isinstance(tool_input, dict)
                                 else str(tool_input),
                                 output_str=result_str[:500],
@@ -1784,17 +1791,25 @@ class CLIAgent:
 
                 # Record activity: tool call started
                 if self._bridge:
+                    safe_args = {
+                        k: v for k, v in tool_args.items()
+                        if k != "runtime"
+                    } if isinstance(tool_args, dict) else {}
                     self._bridge.activity(
                         "tool_start",
                         name=tool_name,
-                        input=json.dumps(tool_args)[:200] if isinstance(tool_args, dict) else str(tool_args)[:200],
+                        input=json.dumps(safe_args, default=str)[:200] if isinstance(tool_args, dict) else str(tool_args)[:200],
                     )
 
                 # Record to shared CLI metrics server history (for dashboard UI)
                 if self._bridge:
+                    safe_args = {
+                        k: v for k, v in tool_args.items()
+                        if k != "runtime"
+                    } if isinstance(tool_args, dict) else {}
                     self._bridge.tool_history(
                         name=tool_name,
-                        input_str=json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args),
+                        input_str=json.dumps(safe_args, default=str) if isinstance(tool_args, dict) else str(tool_args),
                         output_str=msg[:500],
                         latency_ms=elapsed_ms,
                         success=not error,
