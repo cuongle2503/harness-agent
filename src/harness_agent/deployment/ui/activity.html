@@ -212,6 +212,7 @@ footer{
     <div class="stat"><b id="st-ev">0</b><span>Events</span></div>
     <div class="stat"><b id="st-turns">0</b><span>Turns</span></div>
     <div class="stat"><b id="st-tools">0</b><span>Tools</span></div>
+    <div class="stat"><b id="st-hooks">0</b><span>Hooks</span></div>
   </div>
   <select id="session-selector" onchange="switchSession(this.value)" title="Switch harness session" style="margin-right:8px;">
     <option value="">Sessions (0)</option>
@@ -225,63 +226,64 @@ footer{
 <div id="diagram">
   <svg id="svg-layer"></svg>
 
-  <!-- User -->
+  <!-- Left column: Inputs that feed the LLM -->
+  <!-- User — sends messages to LLM -->
   <div class="node user" id="nd-user">
     <div class="head"><span class="ico">👤</span>User</div>
     <div class="body"><span class="tag">input</span> messages</div>
     <div class="pulse"></div>
   </div>
 
-  <!-- System Prompt -->
+  <!-- System Prompt — fed by Rules (always) + Skills (on-demand) -->
   <div class="node sys" id="nd-sys">
     <div class="head"><span class="ico">📋</span>System Prompt</div>
     <div class="body"><span class="tag">system</span> instructions</div>
     <div class="pulse"></div>
   </div>
 
-  <!-- Skills — on-demand procedural workflows (progressive disclosure) -->
+  <!-- Skills — progressive disclosure: desc always, body on invoke -->
   <div class="node skill" id="nd-skill">
     <div class="head"><span class="ico">📚</span>Skills</div>
     <div class="body"><span class="tag">on-demand</span> <span id="nd-skill-info">0 skills</span></div>
     <div class="pulse"></div>
   </div>
 
-  <!-- Rules — always-loaded constraints (every session, every turn) -->
+  <!-- Rules — always-loaded constraints, re-injected on compaction -->
   <div class="node rule" id="nd-rule">
     <div class="head"><span class="ico">📐</span>Rules</div>
     <div class="body"><span class="tag">always-on</span> <span id="nd-rule-info">0 rules</span></div>
     <div class="pulse"></div>
   </div>
 
-  <!-- LLM -->
+  <!-- Center: LLM orchestrator -->
   <div class="node llm" id="nd-llm">
-    <div class="head"><span class="ico">🧠</span>DeepSeek V4</div>
+    <div class="head"><span class="ico">🧠</span>LLM</div>
     <div class="body"><span class="tag">orchestrator</span> reason + decide<span class="latency" id="lat-llm"></span></div>
     <div class="pulse"></div>
   </div>
 
-  <!-- Subagents — spawned by LLM -->
+  <!-- Hooks — intercept lifecycle events (PreToolUse can block) -->
+  <div class="node hook" id="nd-hook">
+    <div class="head"><span class="ico">🪝</span>Hooks</div>
+    <div class="body"><span class="tag">intercept</span> <span id="nd-hook-info">0 hooks</span></div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- Subagents — context-isolated, only final message returns -->
   <div class="node subagent" id="nd-subagent">
     <div class="head"><span class="ico">🤖</span>Subagents</div>
     <div class="body"><span class="tag">isolated</span> <span id="nd-subagent-info">0 subagents</span></div>
     <div class="pulse"></div>
   </div>
 
-  <!-- Hooks — lifecycle events (17 events, can block with exit code 2) -->
-  <div class="node hook" id="nd-hook">
-    <div class="head"><span class="ico">🪝</span>Hooks</div>
-    <div class="body"><span class="tag">lifecycle</span> <span id="nd-hook-info">0 hooks</span></div>
-    <div class="pulse"></div>
-  </div>
-
-  <!-- Tools -->
+  <!-- Tools — called by LLM, results returned -->
   <div class="node tools" id="nd-tools">
     <div class="head"><span class="ico">🔧</span>Tools</div>
     <div class="body"><span class="tag">toolbox</span> 7 tools<span class="latency" id="lat-tools"></span></div>
     <div class="pulse"></div>
   </div>
 
-  <!-- Output -->
+  <!-- Output — final response to user -->
   <div class="node output" id="nd-output">
     <div class="head"><span class="ico">📤</span>Response</div>
     <div class="body"><span class="tag">output</span> final answer<span class="latency" id="lat-output"></span></div>
@@ -295,48 +297,71 @@ footer{
 <div class="toast" id="toast"></div>
 <div class="tip" id="tip"></div>
 
-<footer>Agent workflow — events flow through the system in real time</footer>
+<footer>Agent workflow — events flow left to right, hooks intercept at lifecycle points</footer>
 
 <script>
 const API = '';
 
 // ═════════════════════════════════════════════════════════════
-// NODE DEFINITIONS
+// NODE DEFINITIONS — left-to-right flow matching architecture
+//
+//   Rules ──always──▶ System Prompt ──▶ LLM ◀── User input
+//   Skills ─on-demand▶                    │
+//                                         ├──▶ Tools (Hooks intercept)
+//                                         ├──▶ Subagents (isolated)
+//                                         └──▶ Output ──▶ User
 // ═════════════════════════════════════════════════════════════
 const NODES = [
-  { id:'user',     el:'nd-user',     xPct:3,  yPct:10 },
-  { id:'sys',      el:'nd-sys',      xPct:3,  yPct:34 },
-  { id:'skill',    el:'nd-skill',    xPct:3,  yPct:58 },
-  { id:'rule',     el:'nd-rule',     xPct:3,  yPct:78 },
-  { id:'llm',      el:'nd-llm',      xPct:33, yPct:10 },
-  { id:'subagent', el:'nd-subagent', xPct:33, yPct:38 },
-  { id:'tools',    el:'nd-tools',    xPct:33, yPct:68 },
-  { id:'hook',     el:'nd-hook',     xPct:50, yPct:62 },
-  { id:'output',   el:'nd-output',   xPct:67, yPct:14 },
+  // Left column — inputs feeding into the orchestrator
+  { id:'user',     el:'nd-user',     xPct:2,  yPct:8 },
+  { id:'sys',      el:'nd-sys',      xPct:2,  yPct:28 },
+  { id:'skill',    el:'nd-skill',    xPct:2,  yPct:52 },
+  { id:'rule',     el:'nd-rule',     xPct:2,  yPct:75 },
+  // Center — the orchestrator
+  { id:'llm',      el:'nd-llm',      xPct:30, yPct:42 },
+  // Between LLM and Tools — lifecycle interceptor
+  { id:'hook',     el:'nd-hook',     xPct:30, yPct:72 },
+  // Right of LLM — execution targets
+  { id:'subagent', el:'nd-subagent', xPct:58, yPct:18 },
+  { id:'tools',    el:'nd-tools',    xPct:58, yPct:60 },
+  // Far right — output channel
+  { id:'output',   el:'nd-output',   xPct:80, yPct:42 },
 ];
 
-// Edges — shows actual data flow based on real architecture
+// Edges — shows actual data flow based on real architecture.
+// Hooks use dashed edges because they intercept events; they are
+// NOT data-flow targets — they observe lifecycle events and can
+// block PreToolUse with exit code 2.
 const EDGES = [
-  // User → LLM (input)
-  { from:'user',     to:'llm',      label:'input',       off:0 },
-  // System prompt feeds LLM
-  { from:'sys',      to:'llm',      label:'prompt',      off:0 },
+  // ── Input side ──────────────────────────────────────────
+  // User → LLM (input messages)
+  { from:'user',     to:'llm',      label:'input',       dash:false },
+  // System prompt feeds LLM (assembled by MemoryMiddleware)
+  { from:'sys',      to:'llm',      label:'prompt',      dash:false },
   // Rules → System Prompt: always loaded, re-injected on compaction
-  { from:'rule',     to:'sys',      label:'always',      off:0 },
+  { from:'rule',     to:'sys',      label:'always',      dash:false },
   // Skills → System Prompt: progressive disclosure (desc always, body on invoke)
-  { from:'skill',    to:'sys',      label:'on-demand',   off:0 },
-  // LLM ↔ Tools: direct call/result (hooks fire PRE/POST events)
-  { from:'llm',      to:'tools',    label:'tool call',   off:-26 },
-  { from:'tools',    to:'llm',      label:'result',      off:26 },
-  // Hooks intercept lifecycle events (PreToolUse can block with exit code 2)
-  { from:'llm',      to:'hook',     label:'lifecycle',   off:0 },
-  { from:'tools',    to:'hook',     label:'lifecycle',   off:0 },
+  { from:'skill',    to:'sys',      label:'on-demand',   dash:false },
+
+  // ── Execution ───────────────────────────────────────────
+  // LLM ↔ Tools: direct call/result
+  { from:'llm',      to:'tools',    label:'tool call',   dash:false },
+  { from:'tools',    to:'llm',      label:'result',      dash:false },
   // LLM ↔ Subagents: context-isolated, only final message returns
-  { from:'llm',      to:'subagent', label:'spawn',       off:-24 },
-  { from:'subagent', to:'llm',      label:'summary',     off:24 },
+  { from:'llm',      to:'subagent', label:'spawn',       dash:false },
+  { from:'subagent', to:'llm',      label:'summary',     dash:false },
+
+  // ── Interception (dashed) ───────────────────────────────
+  // Hooks intercept lifecycle events at PRE/POST points.
+  // They observe LLM↔Tools interactions but are NOT part of
+  // the data flow — PreToolUse can block with exit code 2.
+  { from:'llm',      to:'hook',     label:'PRE/POST',    dash:true },
+  { from:'tools',    to:'hook',     label:'PRE/POST',    dash:true },
+
+  // ── Output ──────────────────────────────────────────────
   // LLM → Output → User
-  { from:'llm',      to:'output',   label:'response',    off:0 },
-  { from:'output',   to:'user',     label:'reply',       off:0 },
+  { from:'llm',      to:'output',   label:'response',    dash:false },
+  { from:'output',   to:'user',     label:'reply',       dash:false },
 ];
 
 // Start with server's BASIC_TOOLS — new tools auto-added on first use
@@ -401,7 +426,7 @@ function layout() {
 }
 
 // ═════════════════════════════════════════════════════════════
-// DRAW CONNECTIONS — straight lines, clean & simple
+// DRAW CONNECTIONS — solid for data flow, dashed for interception
 // ═════════════════════════════════════════════════════════════
 const COLORS = {user:'#2563eb',sys:'#64748b',skill:'#16a34a',rule:'#ea580c',llm:'#7c3aed',subagent:'#4f46e5',hook:'#db2777',tools:'#0891b2',output:'#d97706'};
 
@@ -441,38 +466,36 @@ function drawEdges() {
     const c = COLORS[e.from];
     let x1, y1, x2, y2;
 
-    if (e.off !== 0) {
-      const side = e.off < 0 ? 1 : -1;
-      const gap = Math.abs(e.off);
-      if (f.cy < t.cy) {
-        x1 = f.cx + side * gap; y1 = f.bottom;
-        x2 = t.cx + side * gap; y2 = t.top;
-      } else {
-        x1 = f.cx + side * gap; y1 = f.top;
-        x2 = t.cx + side * gap; y2 = t.bottom;
-      }
-    } else {
-      ({x1, y1, x2, y2} = pickPorts(f, t));
-    }
+    ({x1, y1, x2, y2} = pickPorts(f, t));
 
     const mid = markerId++;
-    defs += `
-      <marker id="m${mid}" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
-        <path d="M0,0 L6,3 L0,6 Z" fill="${c}" opacity="0.55"/>
-      </marker>`;
-
-    lines += `
-      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
-            stroke="${c}" stroke-width="2.5" stroke-linecap="round"
-            opacity="0.55" marker-end="url(#m${mid})"/>`;
+    // Dashed edges (hooks) use a different marker shape — open diamond
+    if (e.dash) {
+      defs += `
+        <marker id="m${mid}" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+          <path d="M0,1 L5,3 L0,5 Z" fill="${c}" opacity="0.5"/>
+        </marker>`;
+      lines += `
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+              stroke="${c}" stroke-width="2" stroke-linecap="round"
+              stroke-dasharray="6,4" opacity="0.45"
+              marker-end="url(#m${mid})"/>`;
+    } else {
+      defs += `
+        <marker id="m${mid}" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="${c}" opacity="0.55"/>
+        </marker>`;
+      lines += `
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+              stroke="${c}" stroke-width="2.5" stroke-linecap="round"
+              opacity="0.55" marker-end="url(#m${mid})"/>`;
+    }
 
     const mx = (x1 + x2) / 2;
     const my = (y1 + y2) / 2;
     const angle = Math.atan2(y2 - y1, x2 - x1);
-    const lox = e.off !== 0 ? -Math.sin(angle) * (e.off < 0 ? -22 : 22)
-                            : -Math.sin(angle) * 12;
-    const loy = e.off !== 0 ? Math.cos(angle) * 0
-                            : Math.cos(angle) * 12;
+    const lox = -Math.sin(angle) * 12;
+    const loy = Math.cos(angle) * 12;
     labels += `<text x="${mx + lox}" y="${my + loy}" fill="#64748b" font-size="10" font-weight="600"
                      text-anchor="middle" dominant-baseline="middle"
                      font-family="system-ui,sans-serif" letter-spacing="0.04em" pointer-events="none"
@@ -528,6 +551,9 @@ document.addEventListener('mouseup', () => {
   dragNode = null;
   drawEdges();
 });
+
+// ═════════════════════════════════════════════════════════════
+// PARTICLE SYSTEM — data-flow particles on solid edges only
 // ═════════════════════════════════════════════════════════════
 const pCanvas = document.createElement('canvas');
 pCanvas.style.cssText = 'position:absolute;inset:0;z-index:1;pointer-events:none';
@@ -541,29 +567,18 @@ window.addEventListener('resize', resizePCanvas);
 let particles = [];
 
 function spawn(fromId, toId) {
+  // Don't spawn particles on dashed (interception) edges
+  const edge = EDGES.find(e => e.from === fromId && e.to === toId);
+  if (edge && edge.dash) return;
+
   const fe = document.getElementById('nd-'+fromId);
   const te = document.getElementById('nd-'+toId);
   if (!fe || !te) return;
   const f = elCenter(fe);
   const t = elCenter(te);
   const c = COLORS[fromId];
-  const edge = EDGES.find(e => e.from === fromId && e.to === toId);
 
-  let sx, sy, ex, ey;
-  if (edge && edge.off !== 0) {
-    const side = edge.off < 0 ? 1 : -1;
-    const gap = Math.abs(edge.off);
-    if (f.cy < t.cy) {
-      sx = f.cx + side * gap; sy = f.bottom;
-      ex = t.cx + side * gap; ey = t.top;
-    } else {
-      sx = f.cx + side * gap; sy = f.top;
-      ex = t.cx + side * gap; ey = t.bottom;
-    }
-  } else {
-    ({x1:sx, y1:sy, x2:ex, y2:ey} = pickPorts(f, t));
-  }
-
+  const {x1:sx, y1:sy, x2:ex, y2:ey} = pickPorts(f, t);
   particles.push({ sx, sy, ex, ey, t:0, speed:0.008 + Math.random()*0.007, c });
 }
 
@@ -592,7 +607,7 @@ requestAnimationFrame(animateParticles);
 // ═════════════════════════════════════════════════════════════
 // ACTIVITY STATE
 // ═════════════════════════════════════════════════════════════
-let active = {}; let stats = { ev:0, turns:0, tools:0 };
+let active = {}; let stats = { ev:0, turns:0, tools:0, hooks:0 };
 let glowTimers = {};
 
 function activate(id, strength) {
@@ -661,53 +676,71 @@ async function poll() {
     document.getElementById('st-ev').textContent = stats.ev;
     document.getElementById('st-turns').textContent = stats.turns;
     document.getElementById('st-tools').textContent = stats.tools;
+    document.getElementById('st-hooks').textContent = stats.hooks;
   } catch(e){}
 }
 
 function process(e) {
   stats.ev++;
   switch (e.type) {
+    // ── Input flow ─────────────────────────────────────────
     case 'user_msg':
       activate('user', 0.8);
       spawn('user', 'llm');
       toast(`💬 ${(e.content||'').substring(0,80)}`);
       break;
+
     case 'llm_start':
       activate('llm', 1);
       activate('sys', 0.4);
       spawn('sys', 'llm');
       toast('🧠 LLM reasoning…');
       break;
+
+    // ── Harness components ──────────────────────────────────
     case 'skill_used':
+      // Skill body loaded on-demand (progressive disclosure)
       activate('skill', 0.8);
       spawn('skill', 'sys');
       toast(`📚 Skill: ${e.name||'?'}`);
       break;
+
     case 'rule_applied':
+      // Rules are always present, re-injected on compaction
       activate('rule', 0.6);
       spawn('rule', 'sys');
       toast(`📐 Rule: ${e.name||'?'}`);
       break;
+
     case 'hook_fired':
-      // Hook fires PRE/POST events — it intercepts, doesn't forward
-      activate('hook', 0.9);
-      toast(`🪝 Hook: ${e.name||'?'} (${e.event||'?'})`);
+      // Hooks INTERCEPT lifecycle events — they observe at PRE/POST
+      // points and PreToolUse can block with exit code 2.
+      // Pulse the hook node (interception = brief flash, no data flow).
+      stats.hooks++;
+      pulse('hook');
+      toast(`🪝 ${e.event||'hook'}: ${e.name||'?'}`);
       break;
+
     case 'subagent_start':
+      // Subagent spawned with isolated context
       activate('subagent', 1);
       spawn('llm', 'subagent');
       toast(`🤖 Subagent: ${e.name||'?'}`);
       break;
+
     case 'subagent_end':
+      // Only final message returns from subagent
       pulse('subagent');
       spawn('subagent', 'llm');
       toast(`🤖 Subagent done: ${e.name||'?'}`);
       break;
+
+    // ── Tool execution ──────────────────────────────────────
     case 'tool_start':
       activate('tools', 1);
-      activate('hook', 0.4);
+      // Hook intercepts PRE_TOOL_CALL lifecycle event
+      pulse('hook');
       spawn('llm', 'tools');
-      spawn('llm', 'hook');   // hook intercept event (PRE_TOOL_CALL)
       if (!active['tools']) active['tools'] = { toolCalls:{} };
       if (!active['tools'].toolCalls) active['tools'].toolCalls = {};
       const tn = e.name || '?';
@@ -719,15 +752,18 @@ function process(e) {
       stats.tools++;
       toast(`🔧 ${tn}(${(e.input||'').substring(0,50)})`);
       break;
+
     case 'tool_end':
       pulse('tools');
+      // Hook intercepts POST_TOOL_CALL lifecycle event
       pulse('hook');
       spawn('tools', 'llm');
-      spawn('tools', 'hook');  // hook intercept event (POST_TOOL_CALL)
       if (!active['tools']) active['tools'] = { toolCalls:{} };
       active['tools'].lastLatency = e.latency_ms || 0;
       showLatency('tools', e.latency_ms);
       break;
+
+    // ── Output ──────────────────────────────────────────────
     case 'turn_end':
       stats.turns++;
       activate('output', 1);

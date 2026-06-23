@@ -996,8 +996,22 @@ class CLIAgent:
         If no hooks are registered for this event (typical when
         ``.harness/`` is absent), returns a default ``allowed=True``
         result with near-zero overhead.
+
+        Also emits a ``hook_fired`` activity event so the Live
+        Workflow UI can visualize hook interception in real time.
         """
-        return self._event_bus.fire(event, context)
+        result = self._event_bus.fire(event, context)
+
+        # Emit activity event for the Live Workflow UI
+        if self._bridge:
+            self._bridge.activity(
+                "hook_fired",
+                event=event.value,
+                name=", ".join(result.messages) if result.messages else event.value,
+                allowed=result.allowed,
+            )
+
+        return result
 
     def _connect_metrics_aggregator(self) -> Any:
         """Connect to the metrics aggregator (host or client mode).
@@ -1173,6 +1187,14 @@ class CLIAgent:
         """
         thread_id = config.get("configurable", {}).get("thread_id", "default")
 
+        # Emit llm_start for the Live Workflow UI
+        if self._bridge:
+            self._bridge.activity(
+                "llm_start",
+                model=getattr(self._llm, "model_name", "?"),
+                thread=thread_id,
+            )
+
         # Fire pre_llm_call hooks
         self._fire_hook(
             HookEvent.PRE_LLM_CALL,
@@ -1215,6 +1237,19 @@ class CLIAgent:
                     tool_name = event.get("name", "unknown")
                     tool_input = event.get("data", {}).get("input", {})
 
+                    # Emit subagent_start when task tool spawns a subagent
+                    if tool_name == "task" and self._bridge:
+                        subagent_name = (
+                            tool_input.get("subagent_type", "")
+                            if isinstance(tool_input, dict)
+                            else str(tool_input)[:60]
+                        )
+                        self._bridge.activity(
+                            "subagent_start",
+                            name=subagent_name or "subagent",
+                            input=str(tool_input)[:200],
+                        )
+
                     # Fire pre_tool_call hooks
                     pre_result = self._fire_hook(
                         HookEvent.PRE_TOOL_CALL,
@@ -1255,6 +1290,18 @@ class CLIAgent:
                         box_w = tool_state["box_w"]
                         t0 = tool_state["start"]
                         elapsed_ms = (time.perf_counter() - t0) * 1000
+
+                        # Emit subagent_end when task tool completes
+                        if tool_name == "task" and self._bridge:
+                            self._bridge.activity(
+                                "subagent_end",
+                                name=(
+                                    tool_input.get("subagent_type", "")
+                                    if isinstance(tool_input, dict)
+                                    else "subagent"
+                                ),
+                                latency_ms=round(elapsed_ms, 2),
+                            )
 
                         output = event.get("data", {}).get("output")
                         result_str = str(output) if output else "(no output)"
