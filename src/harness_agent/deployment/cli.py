@@ -1316,9 +1316,13 @@ class CLIAgent:
         try:
             # Build input for CompiledStateGraph
             graph_input: dict[str, Any] = {"messages": messages}
+            # Increase recursion limit — deepagents with SubAgentMiddleware
+            # may need many turns for task tool orchestration.
+            graph_config = dict(config) if config else {}
+            graph_config.setdefault("recursion_limit", 100)
 
             async for event in self._graph.astream_events(
-                graph_input, config, version="v2"
+                graph_input, graph_config, version="v2"
             ):
                 kind = event.get("event", "")
 
