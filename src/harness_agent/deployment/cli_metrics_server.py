@@ -21,6 +21,7 @@ import atexit
 import json
 import os
 import threading
+import types
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -191,7 +192,7 @@ class _MetricsHandler(BaseHTTPRequestHandler):
     agent_id: str
     sandbox_type: str
     session_id: str = "default"
-    harness_info: dict[str, Any] = {}
+    harness_info: types.MappingProxyType[str, Any] = types.MappingProxyType({})
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
         pass
@@ -396,7 +397,7 @@ class _MetricsHandler(BaseHTTPRequestHandler):
 
     def _handle_harness(self) -> None:
         """Return harness configuration info (skills, rules, hooks, subagents)."""
-        info = self.harness_info if isinstance(self.harness_info, dict) else {}
+        info = self.harness_info if hasattr(self.harness_info, "get") else {}
         self._send_json({
             "skills": info.get("skills", []),
             "rules": info.get("rules", []),
@@ -414,7 +415,7 @@ class _MetricsHandler(BaseHTTPRequestHandler):
 
     def _inject_harness_info(self, html: str) -> str:
         """Inject harness info into HTML so counts show immediately."""
-        info = self.harness_info if isinstance(self.harness_info, dict) else {}
+        info = self.harness_info if hasattr(self.harness_info, "get") else {}
         skills_n = len(info.get("skills", []))
         rules_n = len(info.get("rules", []))
         hooks_n = len(info.get("hooks", []))
@@ -579,7 +580,7 @@ def start_metrics_server(
     _MetricsHandler.agent_id = agent_id
     _MetricsHandler.sandbox_type = sandbox_type
     _MetricsHandler.session_id = sid
-    _MetricsHandler.harness_info = harness_info or {}
+    _MetricsHandler.harness_info = types.MappingProxyType(harness_info or {})
 
     host = os.environ.get("HARNESS_MONITORING_HOST", "127.0.0.1")
     server = HTTPServer((host, port), _MetricsHandler)

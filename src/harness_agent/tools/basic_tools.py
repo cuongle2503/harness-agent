@@ -14,6 +14,7 @@ from __future__ import annotations
 import glob as glob_module
 import logging
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -269,6 +270,16 @@ def grep(pattern: str, path: str = ".", include: str = "*.py") -> str:
 # Tool: execute_command
 # ---------------------------------------------------------------------------
 
+_ALLOWED_COMMANDS = frozenset({
+    "ls", "cat", "head", "tail", "find", "grep", "wc", "sort", "uniq",
+    "echo", "pwd", "date", "env", "whoami", "file", "stat", "diff",
+    "mkdir", "cp", "mv", "rm", "touch", "chmod",
+    "git", "python", "python3", "pip", "uv", "node", "npm", "npx",
+    "curl", "wget", "jq", "sed", "awk", "tr", "cut", "tee",
+    "ruff", "mypy", "pytest", "black", "isort",
+})
+
+
 class ExecuteCommandInput(BaseModel):
     command: str = Field(..., description="The shell command to execute")
     timeout: int = Field(
@@ -284,9 +295,21 @@ def execute_command(command: str, timeout: int = 120) -> str:
     timeout. Both stdout and stderr are captured.
     """
     try:
+        args = shlex.split(command)
+    except ValueError as e:
+        return f"Error: invalid command syntax: {e}"
+
+    if not args:
+        return "Error: empty command"
+
+    base_cmd = Path(args[0]).name
+    if base_cmd not in _ALLOWED_COMMANDS:
+        return f"Error: command '{base_cmd}' is not in the allowed list"
+
+    try:
         result = subprocess.run(
-            command,
-            shell=True,
+            args,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=timeout,

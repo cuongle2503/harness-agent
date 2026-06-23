@@ -328,8 +328,12 @@ def create_server_app(
                         )
                         if custom:
                             system_prompt = custom
-                    except Exception:
-                        pass  # Use default system prompt
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to load system prompt from %s: %s",
+                            harness_path,
+                            e,
+                        )
 
             agent = HarnessAgent(
                 llm=llm,
