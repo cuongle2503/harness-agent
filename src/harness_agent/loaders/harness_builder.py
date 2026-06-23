@@ -420,7 +420,11 @@ class HarnessBuilder:
         return pipeline
 
     def _build_system_prompt(self) -> str:
-        """Build system prompt from config override or default."""
+        """Build system prompt from config override or default.
+
+        Dynamically includes available skills from
+        ``.harness/skills/`` when no custom prompt is configured.
+        """
         assert self.config is not None
 
         custom_prompt = self.config_loader.load_system_prompt(
@@ -429,30 +433,60 @@ class HarnessBuilder:
         if custom_prompt:
             return custom_prompt
 
-        return self._default_system_prompt()
+        return self._build_default_system_prompt()
 
-    @staticmethod
-    def _default_system_prompt() -> str:
-        """Default system prompt when no custom one is configured."""
-        return """You are a helpful AI assistant.
+    def _build_default_system_prompt(self) -> str:
+        """Build a default system prompt that includes harness components.
 
-## Core Responsibilities
-- Understand user requests and execute them accurately
-- Use available tools to accomplish tasks
-- Delegate complex tasks to subagents when appropriate
+        Lists available skills with name + description so the LLM
+        knows what procedural workflows are available and can invoke
+        them when the task matches.
+        """
+        parts: list[str] = [
+            "You are a helpful AI assistant.",
+            "",
+            "## Core Responsibilities",
+            "- Understand user requests and execute them accurately",
+            "- Use available tools to accomplish tasks",
+            "- Delegate complex tasks to subagents when appropriate",
+            "- Apply relevant skills when the task matches their description",
+            "",
+            "## Workflow",
+            "1. Analyze the user's request",
+            "2. Check if any available skill below matches the task",
+            "3. If a skill matches, follow its instructions precisely",
+            "4. Plan the approach using write_todos if needed",
+            "5. Execute using tools or delegate to subagents",
+            "6. Synthesize results and respond clearly",
+        ]
 
-## Workflow
-1. Analyze the user's request
-2. Plan the approach using write_todos if needed
-3. Execute using tools or delegate to subagents
-4. Synthesize results and respond clearly
+        # ── Available Skills ──────────────────────────────────────
+        skill_list = self.skill_loader.list_skills()
+        if skill_list:
+            parts.append("")
+            parts.append("## Available Skills")
+            parts.append(
+                "When a user request matches a skill's description, "
+                "follow that skill's instructions exactly. Skills "
+                "provide step-by-step workflows for specific tasks."
+            )
+            parts.append("")
+            for sk in skill_list:
+                name = sk.name or sk.path
+                desc = sk.description or "No description"
+                parts.append(f"- **{name}**: {desc}")
 
-## Quality Standards
-- Be thorough and accurate
-- Cite sources when providing factual information
-- Ask clarifying questions when requirements are unclear
+        # ── Quality Standards ─────────────────────────────────────
+        parts.extend([
+            "",
+            "## Quality Standards",
+            "- Be thorough and accurate",
+            "- Cite sources when providing factual information",
+            "- Ask clarifying questions when requirements are unclear",
+            "",
+            "## Memory",
+            "You have access to persistent memory. Save important "
+            "preferences and learnings for future sessions.",
+        ])
 
-## Memory
-You have access to persistent memory. Save important preferences
-and learnings for future sessions.
-"""
+        return "\n".join(parts)
