@@ -216,7 +216,7 @@ class TestHarnessBuilderBuild:
         builder = HarnessBuilder(project_with_empty_harness)
         # Mock model resolution and middleware building to avoid API key deps
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         agent = builder.build()
 
@@ -233,7 +233,7 @@ class TestHarnessBuilderBuild:
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(empty_project)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         agent = builder.build()
 
@@ -250,7 +250,7 @@ class TestHarnessBuilderBuild:
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(project_with_config_only)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         agent = builder.build()
 
@@ -267,7 +267,7 @@ class TestHarnessBuilderBuild:
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(project_with_skills)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         agent = builder.build()
 
@@ -290,7 +290,7 @@ class TestHarnessBuilderBuild:
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(project_with_rules)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         agent = builder.build()
 
@@ -310,7 +310,7 @@ class TestHarnessBuilderBuild:
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(project_with_subagents)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         agent = builder.build()
 
@@ -330,7 +330,7 @@ class TestHarnessBuilderBuild:
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(project_with_hooks)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         agent = builder.build()
 
@@ -347,7 +347,7 @@ class TestHarnessBuilderBuild:
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(full_harness_project)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         agent = builder.build()
 
@@ -415,7 +415,7 @@ class TestHarnessBuilderConfig:
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(empty_project)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         builder.build()
 
@@ -444,7 +444,7 @@ class TestHarnessBuilderConfig:
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(project)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         builder.build()
 
@@ -606,7 +606,7 @@ class TestHarnessBuilderModelSelection:
 
         # Mock model resolution and middleware to avoid API key requirement
         builder._resolve_model = lambda name: mock.MagicMock()  # type: ignore[method-assign]
-        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda: []  # type: ignore[method-assign]
 
         builder.build()
 

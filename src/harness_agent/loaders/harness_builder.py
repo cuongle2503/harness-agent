@@ -235,7 +235,9 @@ class HarnessBuilder:
         # Convert absolute paths to backend-relative paths.
         # create_deep_agent expects POSIX paths relative to the backend's
         # root_dir. When using FilesystemBackend, this maps to the project_root.
-        _rel = lambda p: str(Path(p).resolve().relative_to(self.project_root))
+        def _rel(p: str) -> str:
+            return str(Path(p).resolve().relative_to(self.project_root))
+
         rule_sources = [_rel(p) for p in rule_sources]
         # Skill sources are directory paths (Agent Skills spec).
         # SkillsMiddleware scans them for */SKILL.md files.
@@ -243,20 +245,12 @@ class HarnessBuilder:
 
         # Step 6: Resolve models — use pre-created models if provided
         main_model = model or self._resolve_model(self.config.model)
-        sum_model = summarization_model or self._resolve_model(
-            self.config.summarization_model
-        )
 
         # Step 7: Build middleware pipeline (excludes MemoryMiddleware,
         # SkillsMiddleware, and SubAgentMiddleware — those are auto-created
         # by create_deep_agent from the `memory=`, `skills=`, and
         # `subagents=` parameters below).
-        middleware = self._build_middleware_pipeline(
-            backend=backend,
-            subagent_defs=subagent_defs,
-            memory_sources=rule_sources + skill_sources,
-            summarization_model=sum_model,
-        )
+        middleware = self._build_middleware_pipeline()
 
         # Step 8: Build system prompt
         system_prompt = self._build_system_prompt()
@@ -351,13 +345,7 @@ class HarnessBuilder:
 
         return ChatDeepSeek(model=model_name, temperature=0.0)  # type: ignore[call-arg]
 
-    def _build_middleware_pipeline(
-        self,
-        backend: CompositeBackend,  # noqa: ARG002
-        subagent_defs: list[dict[str, Any]],  # noqa: ARG002
-        memory_sources: list[str],  # noqa: ARG002
-        summarization_model: BaseChatModel,  # noqa: ARG002
-    ) -> list[Any]:
+    def _build_middleware_pipeline(self) -> list[Any]:
         """Build the middleware pipeline from config or defaults.
 
         Maps middleware names to instances. Uses ``middleware_order``

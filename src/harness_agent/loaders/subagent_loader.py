@@ -197,6 +197,41 @@ class SubAgentLoader:
 
         return definitions
 
+    def load_all_graceful(self) -> tuple[list[dict[str, Any]], list[str]]:
+        """Load subagent definitions, collecting errors per-file.
+
+        Unlike load_all(), this does not abort on the first error.
+        Valid subagents are returned even when some files fail to load.
+
+        Returns:
+            Tuple of (definitions, errors) where errors contains
+            human-readable messages for each failed file.
+        """
+        if not self.exists:
+            return [], []
+
+        definitions: list[dict[str, Any]] = []
+        errors: list[str] = []
+        seen_names: set[str] = set()
+
+        for file in sorted(self.subagents_dir.glob("*.yaml")):
+            try:
+                definition = self._load_one(file)
+            except SubAgentLoadError as e:
+                errors.append(str(e))
+                continue
+
+            name = definition["name"]
+            if name in seen_names:
+                errors.append(
+                    f"Duplicate subagent name '{name}' in {file.name} — skipped"
+                )
+                continue
+            seen_names.add(name)
+            definitions.append(definition)
+
+        return definitions, errors
+
     def _load_one(self, file: Path) -> dict[str, Any]:
         """Load and validate a single subagent definition file.
 

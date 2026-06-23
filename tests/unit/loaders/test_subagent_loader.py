@@ -535,3 +535,103 @@ class TestMiddlewareResolverRegister:
 
         with pytest.raises(SubAgentLoadError, match="must be a dict"):
             resolver.resolve([{"MW": "not_a_dict"}], "test.yaml")
+
+
+# ── Tests: SubAgentLoader.load_all_graceful ──────────────────────────────
+
+
+class TestSubAgentLoaderGraceful:
+    """Tests for SubAgentLoader.load_all_graceful()."""
+
+    def test_graceful_all_valid(
+        self, temp_harness_dir: Path, tool_registry: ToolRegistry
+    ) -> None:
+        """All valid files → all loaded, no errors."""
+        sub_dir = temp_harness_dir / "subagents"
+        sub_dir.mkdir()
+        (sub_dir / "agent-a.yaml").write_text(
+            "name: agent-a\n"
+            "description: First agent.\n"
+            "system_prompt: You are agent A.\n"
+        )
+        (sub_dir / "agent-b.yaml").write_text(
+            "name: agent-b\n"
+            "description: Second agent.\n"
+            "system_prompt: You are agent B.\n"
+        )
+        loader = SubAgentLoader(temp_harness_dir, tool_registry)
+        defs, errors = loader.load_all_graceful()
+        assert len(defs) == 2
+        assert errors == []
+
+    def test_graceful_partial_failure(
+        self, temp_harness_dir: Path, tool_registry: ToolRegistry
+    ) -> None:
+        """One broken file → valid ones still load, error collected."""
+        sub_dir = temp_harness_dir / "subagents"
+        sub_dir.mkdir()
+        (sub_dir / "good.yaml").write_text(
+            "name: good-agent\n"
+            "description: A valid subagent.\n"
+            "system_prompt: You are helpful.\n"
+        )
+        (sub_dir / "bad.yaml").write_text(
+            "name: bad-agent\n"
+            "description: Missing system_prompt.\n"
+        )
+        loader = SubAgentLoader(temp_harness_dir, tool_registry)
+        defs, errors = loader.load_all_graceful()
+        assert len(defs) == 1
+        assert defs[0]["name"] == "good-agent"
+        assert len(errors) == 1
+        assert "system_prompt" in errors[0]
+
+    def test_graceful_duplicate_name_skipped(
+        self, temp_harness_dir: Path, tool_registry: ToolRegistry
+    ) -> None:
+        """Duplicate names → second is skipped with error, first kept."""
+        sub_dir = temp_harness_dir / "subagents"
+        sub_dir.mkdir()
+        (sub_dir / "a-agent.yaml").write_text(
+            "name: dup-name\n"
+            "description: First agent.\n"
+            "system_prompt: You are first.\n"
+        )
+        (sub_dir / "b-agent.yaml").write_text(
+            "name: dup-name\n"
+            "description: Second agent.\n"
+            "system_prompt: You are second.\n"
+        )
+        loader = SubAgentLoader(temp_harness_dir, tool_registry)
+        defs, errors = loader.load_all_graceful()
+        assert len(defs) == 1
+        assert defs[0]["description"] == "First agent."
+        assert len(errors) == 1
+        assert "Duplicate" in errors[0]
+
+    def test_graceful_no_dir(
+        self, temp_harness_dir: Path, tool_registry: ToolRegistry
+    ) -> None:
+        """No subagents/ dir → empty results, no errors."""
+        loader = SubAgentLoader(temp_harness_dir, tool_registry)
+        defs, errors = loader.load_all_graceful()
+        assert defs == []
+        assert errors == []
+
+    def test_graceful_all_broken(
+        self, temp_harness_dir: Path, tool_registry: ToolRegistry
+    ) -> None:
+        """All files broken → empty defs, all errors collected."""
+        sub_dir = temp_harness_dir / "subagents"
+        sub_dir.mkdir()
+        (sub_dir / "bad1.yaml").write_text(
+            "name: missing-desc\n"
+            "system_prompt: No description field.\n"
+        )
+        (sub_dir / "bad2.yaml").write_text(
+            "not_a_valid_key: true\n"
+        )
+        loader = SubAgentLoader(temp_harness_dir, tool_registry)
+        defs, errors = loader.load_all_graceful()
+        assert len(defs) == 0
+        assert len(errors) == 2
