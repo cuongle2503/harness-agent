@@ -57,6 +57,7 @@ class TurnContext:
     event_bus: EventBus
     llm: Any
     harness_rule_sources: list[str] = field(default_factory=list)
+    harness_skill_names: list[str] = field(default_factory=list)
 
     def fire_hook(self, event: HookEvent, context: dict[str, Any]) -> HookResult:
         """Fire a hook event and emit activity for the Live Workflow UI."""
@@ -89,6 +90,21 @@ class TurnContext:
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             },
         )
+
+    def detect_skill_usage(self, user_input: str, response_text: str) -> None:
+        """Detect which skills were activated and emit skill_used activities.
+
+        Matches user input and LLM response against known skill names.
+        Emits a skill_used activity for each matched skill so the UI
+        can visualize skill activation in real time.
+        """
+        if not self.bridge or not self.harness_skill_names:
+            return
+
+        combined = (user_input + " " + response_text).lower()
+        for skill_name in self.harness_skill_names:
+            if skill_name in combined:
+                self.bridge.activity("skill_used", name=skill_name)
 
     def emit_llm_end(self, elapsed_ms: int, *, success: bool = True) -> None:
         """Fire POST_LLM_CALL hook."""
@@ -295,6 +311,20 @@ async def stream_turn_graph(
                     if isinstance(output, dict):
                         last_messages = output.get("messages", last_messages)
 
+            elif kind == "on_custom_event":
+                # SkillsMiddleware emits custom events on skill activation
+                custom_data = event.get("data", {})
+                event_name = event.get("name", "")
+                if "skill" in event_name.lower() and ctx.bridge:
+                    skill_name = (
+                        custom_data.get("skill_name", "")
+                        if isinstance(custom_data, dict)
+                        else str(custom_data)[:60]
+                    )
+                    ctx.bridge.activity(
+                        "skill_used", name=skill_name or event_name
+                    )
+
     except Exception as e:
         ctx.emit_error(e, len(messages), tool_count)
         raise
@@ -304,6 +334,14 @@ async def stream_turn_graph(
 
     if final_text:
         print()
+
+    # Detect skill usage from the user's last message and agent response
+    user_input = ""
+    for msg in reversed(messages):
+        if hasattr(msg, "type") and msg.type == "human":
+            user_input = str(msg.content) if msg.content else ""
+            break
+    ctx.detect_skill_usage(user_input, final_text)
 
     return (final_text if final_text else None, last_messages)
 
@@ -469,6 +507,12 @@ async def stream_turn_agent(
         if not ai_msg.tool_calls:
             if ai_msg.content:
                 print()
+            # Detect skill usage from user input and response
+            user_input = ""
+            for m in messages:
+                if hasattr(m, "type") and m.type == "human":
+                    user_input = str(m.content) if m.content else ""
+            ctx.detect_skill_usage(user_input, str(ai_msg.content))
             return (str(ai_msg.content), full_msgs)
 
         print()
@@ -530,4 +574,10 @@ async def stream_turn_agent(
         if isinstance(msg, AIMessage) and msg.content:
             last_text = str(msg.content)
             break
+    # Detect skill usage at max-iterations exit
+    user_input = ""
+    for m in messages:
+        if hasattr(m, "type") and m.type == "human":
+            user_input = str(m.content) if m.content else ""
+    ctx.detect_skill_usage(user_input, last_text)
     return (last_text, full_msgs)

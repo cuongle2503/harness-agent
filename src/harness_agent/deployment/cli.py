@@ -451,6 +451,10 @@ class CLIAgent:
 
     def _make_turn_context(self, thread_id: str) -> TurnContext:
         """Build a TurnContext for the current turn."""
+        skill_names: list[str] = []
+        if self._harness_builder:
+            for sk in self._harness_builder.skill_loader.list_skills():
+                skill_names.append(sk.name.lower())
         return TurnContext(
             thread_id=thread_id,
             bridge=self._bridge,
@@ -458,6 +462,7 @@ class CLIAgent:
             event_bus=self._event_bus,
             llm=self._llm,
             harness_rule_sources=self._harness_rule_sources,
+            harness_skill_names=skill_names,
         )
 
     def _make_command_context(self) -> CommandContext:
