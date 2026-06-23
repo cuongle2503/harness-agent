@@ -405,10 +405,38 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         })
 
     def _handle_ui(self) -> None:
-        self._send_html(_DASHBOARD_HTML)
+        html = self._inject_harness_info(_DASHBOARD_HTML)
+        self._send_html(html)
 
     def _handle_ui_activity(self) -> None:
-        self._send_html(_ACTIVITY_HTML)
+        html = self._inject_harness_info(_ACTIVITY_HTML)
+        self._send_html(html)
+
+    def _inject_harness_info(self, html: str) -> str:
+        """Inject harness info into HTML so counts show immediately."""
+        info = self.harness_info if isinstance(self.harness_info, dict) else {}
+        skills_n = len(info.get("skills", []))
+        rules_n = len(info.get("rules", []))
+        hooks_n = len(info.get("hooks", []))
+        subagents_n = len(info.get("subagents", []))
+        # Replace the initial "0 skills", "0 subagents" etc. with real counts
+        html = html.replace(
+            'id="nd-skill-info">0 skills<',
+            f'id="nd-skill-info">{skills_n} skills<',
+        )
+        html = html.replace(
+            'id="nd-subagent-info">0 subagents<',
+            f'id="nd-subagent-info">{subagents_n} subagents<',
+        )
+        html = html.replace(
+            'id="nd-rule-info">0 rules<',
+            f'id="nd-rule-info">{rules_n} rules<',
+        )
+        html = html.replace(
+            'id="nd-hook-info">0 hooks<',
+            f'id="nd-hook-info">{hooks_n} hooks<',
+        )
+        return html
 
     def _handle_root(self) -> None:
         self.send_response(302)
