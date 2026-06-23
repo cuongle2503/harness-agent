@@ -124,7 +124,7 @@ class PermissionBoundary:
         """
         resolved = Path(file_path).resolve()
         workspace = self.workspace_root.resolve()
-        return str(resolved).startswith(str(workspace))
+        return resolved.is_relative_to(workspace)
 
 
 def _path_matches(file_path: str, pattern: str) -> bool:
@@ -142,7 +142,8 @@ def _path_matches(file_path: str, pattern: str) -> bool:
     # Simple prefix matching for common cases
     if pattern.endswith("/**"):
         prefix = pattern[:-3]
-        return file_path.startswith(prefix)
+        from pathlib import PurePath
+        return PurePath(file_path).is_relative_to(prefix)
     if pattern.endswith("*"):
         # Match files in the same directory
         import os

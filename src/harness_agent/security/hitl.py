@@ -103,11 +103,11 @@ class HumanInTheLoopMiddleware(AgentMiddleware):
             if self.approval_callback is not None:
                 try:
                     approved = self.approval_callback(tool_name, request)
-                except Exception:
+                except Exception as exc:
                     logger.exception(
                         "HITL approval callback failed for tool '%s'", tool_name
                     )
-                    approved = False
+                    raise HITLApprovalDeniedError(tool_name) from exc
 
             if not approved:
                 raise HITLApprovalDeniedError(tool_name)

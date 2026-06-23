@@ -14,8 +14,10 @@ Key rules:
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from harness_agent.core.exceptions import HarnessError
+from harness_agent.security.sandbox import SandboxConfig
 
 
 class SubprocessSafetyError(HarnessError):
@@ -33,6 +35,7 @@ def safe_run(
     max_output: int = 100_000,
     cwd: str | None = None,
     env: dict[str, str] | None = None,
+    sandbox: SandboxConfig | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a subprocess safely.
 
@@ -47,15 +50,24 @@ def safe_run(
         max_output: Maximum stdout+stderr size in bytes.
         cwd: Optional working directory.
         env: Optional environment variables (merged with current env).
+        sandbox: Optional SandboxConfig to enforce command allow-list.
 
     Returns:
         CompletedProcess with stdout and stderr as strings.
 
     Raises:
+        SubprocessSafetyError: If the command is not allowed.
         SubprocessTimeoutError: If the process exceeds the timeout.
     """
     if not args:
         raise SubprocessSafetyError("Command args list must not be empty")
+
+    if sandbox is not None:
+        base_cmd = Path(args[0]).name
+        if not sandbox.is_command_allowed(base_cmd):
+            raise SubprocessSafetyError(
+                f"Command '{base_cmd}' is not in the sandbox allow-list"
+            )
 
     try:
         result = subprocess.run(

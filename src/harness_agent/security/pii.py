@@ -46,13 +46,16 @@ class PIIMiddleware:
         Returns:
             The text with PII redacted (if redact=True), or original text.
         """
+        self._detected.clear()
+
         for name, pattern in self.patterns.items():
             matches = pattern.findall(text)
             for match in matches:
+                match_str = str(match)
                 self._detected.append({
                     "type": name,
                     "source": source,
-                    "value_preview": str(match)[:50] + "...",
+                    "value_preview": match_str[:50] + ("..." if len(match_str) > 50 else ""),
                 })
 
         if self.redact and self._detected:
