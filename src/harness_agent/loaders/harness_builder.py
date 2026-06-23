@@ -144,15 +144,28 @@ class HarnessBuilder:
         return self.config
 
     def get_memory_sources(self) -> list[str]:
-        """Return memory source paths from skills + rules.
+        """Return memory source paths from **rules only**.
 
-        These paths can be passed to ``create_deep_agent(memory=...)``
-        for MemoryMiddleware-driven progressive disclosure.
+        Rules are always-loaded context handled by MemoryMiddleware.
+        Skills use ``get_skill_sources()`` for progressive disclosure
+        via SkillsMiddleware.
 
         Returns:
-            List of file paths to skill and rule markdown files.
+            List of file paths to rule markdown files.
         """
-        return self._collect_memory_sources()
+        return self.rule_loader.get_memory_sources()
+
+    def get_skill_sources(self) -> list[str]:
+        """Return skill source paths for progressive disclosure.
+
+        Skills use SkillsMiddleware: only name + description are
+        loaded at start; the full body is loaded on-demand when the
+        task matches the skill description.
+
+        Returns:
+            List of file paths to skill markdown files.
+        """
+        return self.skill_loader.get_memory_sources()
 
     def get_subagent_defs(self) -> list[dict[str, Any]]:
         """Return subagent definitions from ``.harness/subagents/``.
@@ -203,8 +216,11 @@ class HarnessBuilder:
         # Step 4: Load subagents from .harness/subagents/
         subagent_defs = self.subagent_loader.load_all()
 
-        # Step 5: Collect memory sources from skills + rules
-        memory_sources = self._collect_memory_sources()
+        # Step 5: Collect sources — rules (always-loaded) and
+        # skills (progressive disclosure) are handled by different
+        # middleware: MemoryMiddleware for rules, SkillsMiddleware for skills.
+        rule_sources = self.rule_loader.get_memory_sources()
+        skill_sources = self.skill_loader.get_memory_sources()
 
         # Step 6: Resolve models
         main_model = self._resolve_model(self.config.model)
@@ -212,13 +228,14 @@ class HarnessBuilder:
             self.config.summarization_model
         )
 
-        # Step 7: Build middleware pipeline (excludes MemoryMiddleware and
-        # SubAgentMiddleware — those are auto-created by create_deep_agent
-        # from the `memory=` and `subagents=` parameters below).
+        # Step 7: Build middleware pipeline (excludes MemoryMiddleware,
+        # SkillsMiddleware, and SubAgentMiddleware — those are auto-created
+        # by create_deep_agent from the `memory=`, `skills=`, and
+        # `subagents=` parameters below).
         middleware = self._build_middleware_pipeline(
             backend=backend,
             subagent_defs=subagent_defs,
-            memory_sources=memory_sources,
+            memory_sources=rule_sources + skill_sources,
             summarization_model=summarization_model,
         )
 
@@ -226,17 +243,18 @@ class HarnessBuilder:
         system_prompt = self._build_system_prompt()
 
         # Step 9: Create agent
-        # NOTE: Do NOT pass MemoryMiddleware or SubAgentMiddleware in the
-        # `middleware` list — create_deep_agent auto-creates them from the
-        # `memory=` and `subagents=` parameters. Passing both causes
-        # "Please remove duplicate middleware instances."
+        # NOTE: Do NOT pass MemoryMiddleware, SkillsMiddleware, or
+        # SubAgentMiddleware in the `middleware` list — create_deep_agent
+        # auto-creates them from the corresponding parameters below.
+        # Passing both causes "Please remove duplicate middleware instances."
         self.agent = create_deep_agent(
             model=main_model,
             middleware=middleware,
             backend=backend,
             system_prompt=system_prompt,
             subagents=subagent_defs if subagent_defs else None,
-            memory=memory_sources if memory_sources else None,
+            memory=rule_sources if rule_sources else None,
+            skills=skill_sources if skill_sources else None,
         )
 
         logger.info("Harness built successfully")
@@ -280,7 +298,11 @@ class HarnessBuilder:
             return StateBackend()
 
     def _collect_memory_sources(self) -> list[str]:
-        """Collect all memory sources from skills + rules."""
+        """Collect all memory sources from skills + rules (legacy).
+
+        Prefer ``get_memory_sources()`` (rules only) and
+        ``get_skill_sources()`` (skills only) for new code.
+        """
         sources: list[str] = []
         sources.extend(self.skill_loader.get_memory_sources())
         sources.extend(self.rule_loader.get_memory_sources())

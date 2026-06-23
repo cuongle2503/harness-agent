@@ -263,7 +263,7 @@ class TestHarnessBuilderBuild:
         mock_create: mock.MagicMock,
         project_with_skills: Path,
     ) -> None:
-        """Build with skills → skill paths are passed to create_deep_agent."""
+        """Build with skills → skill paths go to skills= for progressive disclosure."""
         mock_create.return_value = _make_mock_agent()
         builder = HarnessBuilder(project_with_skills)
         builder._resolve_model = lambda name: _make_mock_model()  # type: ignore[method-assign]
@@ -273,9 +273,12 @@ class TestHarnessBuilderBuild:
 
         assert agent is not None
         call_kwargs = mock_create.call_args.kwargs
-        assert call_kwargs["memory"] is not None
-        assert len(call_kwargs["memory"]) == 1
-        assert "test-skill.md" in call_kwargs["memory"][0]
+        # Skills go to skills= (SkillsMiddleware — progressive disclosure)
+        assert call_kwargs["skills"] is not None
+        assert len(call_kwargs["skills"]) == 1
+        assert "test-skill.md" in call_kwargs["skills"][0]
+        # Memory should be None (no rules in this fixture)
+        assert call_kwargs["memory"] is None
 
     @mock.patch("harness_agent.loaders.harness_builder.create_deep_agent")
     def test_build_with_rules(
@@ -353,7 +356,13 @@ class TestHarnessBuilderBuild:
         assert builder.event_bus.listener_count == 1
 
         call_kwargs = mock_create.call_args.kwargs
+        # Rules → memory (always-loaded)
         assert call_kwargs["memory"] is not None
+        assert len(call_kwargs["memory"]) == 1
+        # Skills → skills (progressive disclosure)
+        assert call_kwargs["skills"] is not None
+        assert len(call_kwargs["skills"]) == 1
+        # Subagents
         assert call_kwargs["subagents"] is not None
         assert len(call_kwargs["subagents"]) == 1
 
@@ -497,27 +506,36 @@ class TestHarnessBuilderMemorySources:
         assert sources == []
 
     def test_get_memory_sources_with_skills(self, project_with_skills: Path) -> None:
-        """Skill paths are collected as memory sources."""
+        """Skill paths are collected via get_skill_sources() (not memory)."""
         builder = HarnessBuilder(project_with_skills)
         builder.load_config()
-        sources = builder.get_memory_sources()
-        assert len(sources) == 1
-        assert "test-skill.md" in sources[0]
+        # Skills go to get_skill_sources() for progressive disclosure
+        skill_sources = builder.get_skill_sources()
+        assert len(skill_sources) == 1
+        assert "test-skill.md" in skill_sources[0]
+        # Rules should be empty (no rules in this fixture)
+        assert builder.get_memory_sources() == []
 
     def test_get_memory_sources_with_rules(self, project_with_rules: Path) -> None:
-        """Rule paths are collected as memory sources."""
+        """Rule paths are collected as memory sources (rules only)."""
         builder = HarnessBuilder(project_with_rules)
         builder.load_config()
         sources = builder.get_memory_sources()
         assert len(sources) == 1
         assert "test-rule.md" in sources[0]
+        # Skills should be empty (no skills in this fixture)
+        assert builder.get_skill_sources() == []
 
     def test_get_memory_sources_combined(self, full_harness_project: Path) -> None:
-        """Skills + rules are both collected."""
+        """Skills + rules are both collected via legacy method."""
         builder = HarnessBuilder(full_harness_project)
         builder.load_config()
-        sources = builder.get_memory_sources()
+        # Legacy combined method
+        sources = builder._collect_memory_sources()
         assert len(sources) == 2  # 1 skill + 1 rule
+        # New separated methods
+        assert len(builder.get_memory_sources()) == 1  # rules only
+        assert len(builder.get_skill_sources()) == 1   # skills only
 
 
 class TestHarnessBuilderSubagentDefs:
