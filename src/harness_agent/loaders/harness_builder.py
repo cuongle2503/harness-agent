@@ -312,7 +312,10 @@ class HarnessBuilder:
         if name == "store":
             return StoreBackend(file_format="v2")
         elif name == "filesystem":
-            return FilesystemBackend(root_dir=output_dir, virtual_mode=True)
+            # virtual_mode=False allows both absolute and relative paths.
+            # With virtual_mode=True, absolute paths that match root_dir
+            # are NOT stripped, causing path_not_found on real files.
+            return FilesystemBackend(root_dir=output_dir, virtual_mode=False)
         else:  # state (default)
             return StateBackend()
 
