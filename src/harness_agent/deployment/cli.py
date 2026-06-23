@@ -1880,7 +1880,7 @@ class CLIAgent:
                     print("Goodbye!")
                     break
                 if user_input.lower() == "help":
-                    self._print_help()
+                    self._cmd_help("", history, "")
                     continue
                 if user_input.lower() == "clear":
                     history = []
@@ -2270,20 +2270,6 @@ class CLIAgent:
         sep_w = _box_width() + 4  # +4 accounts for "  " indent + left/right borders
         print(Color.muted(info))
         print(Color.dim("─" * sep_w))
-
-    @staticmethod
-    def _print_help() -> None:
-        """Print help message."""
-        w = _box_width()
-        print(f"\n  {Color.tool('Slash Commands')}")
-        print(f"  {Color.dim('─' * w)}")
-        print(f"  {Color.tool('/help'):<20} Show this message")
-        print(f"  {Color.tool('/clear'):<20} Reset session — start fresh")
-        print(f"  {Color.tool('/context'):<20} Show session context & stats")
-        print(f"  {Color.tool('/memory'):<20} Show memory store stats")
-        print(f"  {Color.tool('/exit'):<20} Exit the CLI")
-        print(f"\n  {Color.dim('Plain commands (no /) also work:')} "
-              f"help, clear, memory, exit")
 
     def _print_memory(self) -> None:
         """Print memory statistics."""

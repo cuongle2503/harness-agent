@@ -17,6 +17,7 @@ Real sandboxing requires OS-level isolation (Docker/gVisor) with:
 
 from __future__ import annotations
 
+import json
 import re
 
 from langchain_core.tools import tool
@@ -92,4 +93,7 @@ def execute_python(code: str) -> str:
     Returns:
         The execution output (stdout + stderr) or error message.
     """
-    return f"Execution result (sandboxed): code length {len(code)}"
+    return json.dumps({
+        "status": "not_implemented",
+        "message": "execute_python is not yet implemented. Configure sandbox to enable.",
+    })

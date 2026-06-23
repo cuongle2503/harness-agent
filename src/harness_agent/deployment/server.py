@@ -58,7 +58,7 @@ class AgentMessage(BaseModel):
 class AgentRequest(BaseModel):
     """Request body for agent invocation."""
 
-    messages: list[dict[str, Any]] = Field(
+    messages: list[AgentMessage] = Field(
         ..., description="List of chat messages"
     )
     thread_id: str | None = Field(
@@ -434,7 +434,7 @@ def create_server_app(
         thread_id = request.thread_id or "default"
 
         # Log user message
-        user_content = str(request.messages[-1].get("content", "")) if request.messages else ""
+        user_content = str(request.messages[-1].content) if request.messages else ""
         _activity_log.append({
             "type": "user_msg", "content": user_content[:200],
             "thread": thread_id, "time": _time_module.monotonic(),
@@ -458,7 +458,7 @@ def create_server_app(
             _activity_log.pop(0)
 
         result = await agent.ainvoke(
-            {"messages": request.messages},
+            {"messages": [m.model_dump() for m in request.messages]},
             config=run_config,
         )
 
@@ -534,7 +534,7 @@ def create_server_app(
 
         # Persist to memory store
         _memory_store[thread_id] = _memory_store.get(thread_id, []) + [
-            {"role": "user", "content": str(request.messages)},
+            {"role": "user", "content": user_content},
             {"role": "assistant", "content": str(content)},
         ]
 

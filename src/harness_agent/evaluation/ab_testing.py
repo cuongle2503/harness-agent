@@ -200,9 +200,6 @@ class AgentABTester:
         result_b: dict[str, Any],
     ) -> str:
         """Use an LLM judge to compare responses."""
-        if self.judge is None:
-            return "tie"
-
         content_a = self._extract_content(result_a)
         content_b = self._extract_content(result_b)
 

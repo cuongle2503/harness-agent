@@ -169,7 +169,8 @@ class TestAgentRequest:
         )
         assert req.thread_id == "test-1"
         assert len(req.messages) == 1
-        assert req.messages[0]["role"] == "user"
+        assert req.messages[0].role == "user"
+        assert req.messages[0].content == "hello"
 
     def test_default_thread_id(self) -> None:
         """AgentRequest uses 'default' thread_id when not specified."""

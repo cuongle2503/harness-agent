@@ -135,12 +135,6 @@ class TestToolRegistryInvokeTool:
 class TestToolRegistryFromInventory:
     """Tests for ToolRegistry.from_inventory()."""
 
-    def test_returns_empty_registry(self) -> None:
-        registry = ToolRegistry.from_inventory(None)
-        assert isinstance(registry, ToolRegistry)
-        assert len(registry) == 0
-
-    def test_classmethod_creates_new_instance(self) -> None:
-        reg1 = ToolRegistry.from_inventory(None)
-        reg2 = ToolRegistry.from_inventory(None)
-        assert reg1 is not reg2
+    def test_raises_not_implemented(self) -> None:
+        with pytest.raises(NotImplementedError, match="not yet implemented"):
+            ToolRegistry.from_inventory(None)

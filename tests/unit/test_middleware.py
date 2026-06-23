@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from langchain.agents.middleware import AgentMiddleware
 
-from harness_agent.middleware.custom_middleware import LoggingMiddleware
+from harness_agent.middleware import LoggingMiddleware
 
 
 class TestLoggingMiddleware:

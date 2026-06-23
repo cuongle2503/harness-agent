@@ -105,35 +105,19 @@ class AgentEvaluator:
         Returns:
             An EvaluationResult with all computed metrics.
         """
-        result = EvaluationResult()
         if not self.test_cases:
-            return result
+            return EvaluationResult()
 
-        successes = 0
-        total_latency = 0.0
-        total_tokens = 0
-
+        results = []
         for case in self.test_cases:
             start = time.time()
             output = self.agent.invoke(
                 {"messages": [{"role": "user", "content": case["input"]}]}
             )
             latency = (time.time() - start) * 1000
-            total_latency += latency
+            results.append((output, latency))
 
-            if self._is_successful(output, case.get("expected", {})):
-                successes += 1
-
-            total_tokens += len(str(output.get("messages", [])))
-
-        n = len(self.test_cases)
-        result.task_completion_rate = successes / n if n > 0 else 0.0
-        result.avg_latency_ms = total_latency / n if n > 0 else 0.0
-        result.avg_token_usage = int(total_tokens / n) if n > 0 else 0
-        result.pass_at_1 = result.task_completion_rate
-        result.pass_at_3 = min(1.0, result.task_completion_rate + 0.1)
-
-        return result
+        return self._aggregate(results)
 
     async def aevaluate(self) -> EvaluationResult:
         """Async version of evaluate().
@@ -141,25 +125,33 @@ class AgentEvaluator:
         Returns:
             An EvaluationResult with all computed metrics.
         """
-        result = EvaluationResult()
         if not self.test_cases:
-            return result
+            return EvaluationResult()
 
-        successes = 0
-        total_latency = 0.0
-        total_tokens = 0
-
+        results = []
         for case in self.test_cases:
             start = time.time()
             output = await self.agent.ainvoke(
                 {"messages": [{"role": "user", "content": case["input"]}]}
             )
             latency = (time.time() - start) * 1000
+            results.append((output, latency))
+
+        return self._aggregate(results)
+
+    def _aggregate(
+        self, results: list[tuple[dict[str, Any], float]]
+    ) -> EvaluationResult:
+        """Compute aggregate metrics from individual run results."""
+        result = EvaluationResult()
+        successes = 0
+        total_latency = 0.0
+        total_tokens = 0
+
+        for i, (output, latency) in enumerate(results):
             total_latency += latency
-
-            if self._is_successful(output, case.get("expected", {})):
+            if self._is_successful(output, self.test_cases[i].get("expected", {})):
                 successes += 1
-
             total_tokens += len(str(output.get("messages", [])))
 
         n = len(self.test_cases)

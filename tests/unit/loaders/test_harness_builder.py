@@ -295,10 +295,10 @@ class TestHarnessBuilderBuild:
         agent = builder.build()
 
         assert agent is not None
-        # Verify rules were collected
-        sources = builder._collect_memory_sources()
-        assert len(sources) == 1
-        assert "test-rule.md" in sources[0]
+        # Verify rules were collected via the public API
+        rule_sources = builder.rule_loader.get_memory_sources()
+        assert len(rule_sources) == 1
+        assert "test-rule.md" in rule_sources[0]
 
     @mock.patch("harness_agent.loaders.harness_builder.create_deep_agent")
     def test_build_with_subagents(
@@ -527,15 +527,14 @@ class TestHarnessBuilderMemorySources:
         assert builder.get_skill_sources() == []
 
     def test_get_memory_sources_combined(self, full_harness_project: Path) -> None:
-        """Skills + rules are both collected via legacy method."""
+        """Skills + rules are both collected via separated methods."""
         builder = HarnessBuilder(full_harness_project)
         builder.load_config()
-        # Legacy combined method
-        sources = builder._collect_memory_sources()
-        assert len(sources) == 2  # 1 skill + 1 rule
         # New separated methods
-        assert len(builder.get_memory_sources()) == 1  # rules only
-        assert len(builder.get_skill_sources()) == 1   # skills only
+        rule_sources = builder.get_memory_sources()
+        skill_sources = builder.get_skill_sources()
+        assert len(rule_sources) == 1   # rules only
+        assert len(skill_sources) == 1  # skills only
 
 
 class TestHarnessBuilderSubagentDefs:

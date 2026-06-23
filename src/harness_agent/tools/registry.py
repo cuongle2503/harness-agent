@@ -93,17 +93,18 @@ class ToolRegistry:
     def from_inventory(cls, inventory: Any) -> ToolRegistry:
         """Create a registry from a ToolInventory instance.
 
-        This is a forward-looking classmethod for integration with the
-        existing ToolInventory from tools.py. In Phase 3, it returns
-        an empty registry; full integration is deferred to Phase 4+.
+        Not yet implemented. Will integrate with ToolInventory in a future phase.
 
         Args:
-            inventory: A ToolInventory instance (unused in Phase 3).
+            inventory: A ToolInventory instance.
 
-        Returns:
-            A new, empty ToolRegistry.
+        Raises:
+            NotImplementedError: Always — integration deferred to a future phase.
         """
-        return cls()
+        raise NotImplementedError(
+            "ToolRegistry.from_inventory() is not yet implemented. "
+            "Use ToolRegistry() and register tools individually."
+        )
 
     def __len__(self) -> int:
         return len(self._tools)

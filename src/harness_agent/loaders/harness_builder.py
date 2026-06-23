@@ -320,16 +320,6 @@ class HarnessBuilder:
         else:  # state (default)
             return StateBackend()
 
-    def _collect_memory_sources(self) -> list[str]:
-        """Collect all memory sources from skills + rules (legacy).
-
-        Prefer ``get_memory_sources()`` (rules only) and
-        ``get_skill_sources()`` (skills only) for new code.
-        """
-        sources: list[str] = []
-        sources.extend(self.skill_loader.get_memory_sources())
-        sources.extend(self.rule_loader.get_memory_sources())
-        return sources
 
     def _resolve_model(self, model_name: str) -> BaseChatModel:
         """Resolve a model name to a BaseChatModel instance.

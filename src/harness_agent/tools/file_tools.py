@@ -161,37 +161,6 @@ class FileWriteInput(BaseModel):
         return str(safe)
 
 
-class ShellInput(BaseModel):
-    """Input schema for shell command execution with allow-list validation.
-
-    NOTE: This class is NOT currently wired to any @tool. It exists as a
-    reference schema for future shell execution tools. The allow-list
-    excludes high-risk commands (rm, curl, wget, docker) by default;
-    these can be enabled via explicit opt-in configuration.
-    """
-
-    command: str = Field(..., max_length=2000)
-
-    @field_validator("command")
-    @classmethod
-    def validate_command(cls, v: str) -> str:
-        """Validate shell command against safe allow list.
-
-        Explicitly EXCLUDES: rm, curl, wget, docker, npm, pip, uv
-        (These require opt-in via configuration to enable).
-        """
-        allowed_commands = {
-            "ls", "cat", "grep", "find",
-            "echo", "head", "tail", "wc", "sort", "uniq", "cut",
-            "mkdir", "cp", "mv", "chmod",
-            "python", "pytest", "ruff", "mypy",
-            "git", "gh",
-        }
-        base_cmd = v.strip().split()[0] if v.strip() else ""
-        if base_cmd not in allowed_commands:
-            raise ValueError(f"Command not allowed: '{base_cmd}'")
-        return v
-
 
 class SearchInput(BaseModel):
     """Input schema for search operations with sanitization."""
@@ -224,7 +193,7 @@ def fetch_url(url: str, max_length: int = 100_000) -> str:
         The page content converted to markdown (valid JSON).
     """
     return json.dumps({
-        "content": "",
+        "status": "not_implemented",
+        "message": "fetch_url is not yet implemented. Configure httpx backend to enable.",
         "url": url,
-        "status": "placeholder",
     })

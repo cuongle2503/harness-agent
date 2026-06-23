@@ -60,7 +60,8 @@ def web_search(query: str, max_results: int = 5) -> str:
         A valid JSON string with search results including title, url, and content.
     """
     return json.dumps({
-        "results": [],
+        "status": "not_implemented",
+        "message": "web_search is not yet implemented. Configure Tavily API to enable.",
         "query": query,
         "max_results": max_results,
     })
