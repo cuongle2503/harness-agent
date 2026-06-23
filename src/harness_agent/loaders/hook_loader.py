@@ -323,6 +323,8 @@ class HookLoader:
     def load_all(self) -> list[str]:
         """Scan .harness/hooks/ and register all hooks into the EventBus.
 
+        Idempotent — subsequent calls skip already-loaded hooks.
+
         Returns:
             List of hook file names that were successfully loaded.
         """
@@ -335,9 +337,17 @@ class HookLoader:
             )
             return []
 
+        # Track loaded files to make subsequent calls idempotent
+        if not hasattr(self, "_loaded_files"):
+            self._loaded_files: set[str] = set()
+
         loaded: list[str] = []
         for file in sorted(self.hooks_dir.iterdir()):
             if file.is_dir():
+                continue
+
+            # Skip already-loaded files (idempotent)
+            if file.name in self._loaded_files:
                 continue
 
             event = self._file_to_event(file.stem)
@@ -353,6 +363,7 @@ class HookLoader:
             if executor is not None:
                 self.event_bus.on(event, executor)
                 loaded.append(file.name)
+                self._loaded_files.add(file.name)
                 logger.info(
                     "Loaded hook: %s → %s", file.name, event.value
                 )

@@ -795,16 +795,21 @@ class CLIAgent:
             for e in errors:
                 print(f"    {Color.dim(f'- {e}')}")
 
-        # 2. Collect skill/rule memory sources (file paths, NOT content)
+        # 2. Use builder's EventBus — hooks were registered into it by
+        #    load_config(). Replace the CLI's empty EventBus so _fire_hook
+        #    actually triggers the registered hooks.
+        self._event_bus = builder.event_bus
+
+        # 3. Collect skill/rule memory sources (file paths, NOT content)
         # MemoryMiddleware in create_deep_agent handles progressive
         # disclosure — skills are name+description only until invoked.
         self._harness_skill_sources = builder.skill_loader.get_memory_sources()
         self._harness_rule_sources = builder.rule_loader.get_memory_sources()
 
-        # 3. Load hooks into event bus (already done by load_config)
-        #    HookLoader was called inside builder.load_config()
+        # 4. Hooks are already registered by load_config() above —
+        #    we're now using builder.event_bus (see step 2).
 
-        # 4. Load subagent definitions
+        # 5. Load subagent definitions
         try:
             self._harness_subagent_defs = builder.get_subagent_defs()
         except Exception as e:
