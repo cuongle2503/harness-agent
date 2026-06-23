@@ -24,8 +24,20 @@ def anyio_backend() -> str:
 
 @pytest.fixture
 def fake_llm() -> FakeListChatModel:
-    """A fake LLM that returns a fixed string response."""
-    return FakeListChatModel(responses=["Hello, I am an agent."])
+    """A fake LLM that returns a fixed string response.
+
+    Monkey-patches ``bind_tools`` to return ``self`` because
+    ``FakeListChatModel.bind_tools()`` raises ``NotImplementedError``
+    in some LangChain versions. Tests that pass real tool lists
+    (e.g., ``BASIC_TOOLS``) need ``bind_tools`` to at least not crash.
+
+    Uses ``object.__setattr__`` to bypass Pydantic's field validation.
+    """
+    llm = FakeListChatModel(responses=["Hello, I am an agent."])
+    # FakeListChatModel is a Pydantic model — can't set arbitrary attrs
+    # via normal assignment.  Use object.__setattr__ to bypass validation.
+    object.__setattr__(llm, "bind_tools", lambda *args: llm)
+    return llm
 
 
 @pytest.fixture
