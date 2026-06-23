@@ -1029,6 +1029,57 @@ class CLIAgent:
 
         return "\n".join(parts)
 
+    # ── Harness info for UI ──────────────────────────────────────────────
+
+    def _build_harness_info(self) -> dict[str, Any]:
+        """Build harness info dict for the UI ``/harness`` endpoint.
+
+        Returns a dict with ``skills``, ``rules``, ``hooks``, and
+        ``subagents`` keys — each a list of name strings or info dicts.
+        """
+        info: dict[str, Any] = {
+            "skills": [],
+            "rules": [],
+            "hooks": [],
+            "subagents": [],
+        }
+
+        # Skills — extract name from file path
+        for src in self._harness_skill_sources:
+            stem = Path(src).stem
+            # Try to get description from skill loader
+            desc = ""
+            if self._harness_builder is not None:
+                for sk in self._harness_builder.skill_loader.list_skills():
+                    if sk.path == src or sk.name == stem:
+                        desc = sk.description or ""
+                        break
+            info["skills"].append({
+                "name": stem,
+                "description": desc,
+            })
+
+        # Rules — extract name from file path
+        for src in self._harness_rule_sources:
+            stem = Path(src).stem
+            info["rules"].append({"name": stem, "path": src})
+
+        # Hooks — from event bus
+        if self._event_bus is not None:
+            listeners = getattr(self._event_bus, "_listeners", {})
+            for event, handlers in listeners.items():
+                if handlers:
+                    info["hooks"].append({"event": str(event.value)})
+
+        # Subagents — name + description
+        for sa in self._harness_subagent_defs:
+            info["subagents"].append({
+                "name": sa.get("name", "unnamed"),
+                "description": sa.get("description", ""),
+            })
+
+        return info
+
     # ── Hook helpers ────────────────────────────────────────────────────
 
     def _fire_hook(
@@ -1112,6 +1163,8 @@ class CLIAgent:
 
         # --- HOST MODE: start aggregator ---
         try:
+            # Build harness info for UI display (skills, rules, hooks, subagents)
+            harness_info = self._build_harness_info()
             server, actual_port = start_metrics_server(
                 metrics=self._metrics,
                 start_time=self._start_time,
@@ -1121,6 +1174,7 @@ class CLIAgent:
                 sandbox_type=self.config.sandbox_type,
                 session_name=name,
                 session_id=session_id,
+                harness_info=harness_info,
             )
             self._session_id = session_id
             self._bridge = _MetricsBridge(session_id)  # host mode

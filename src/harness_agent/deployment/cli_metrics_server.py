@@ -191,6 +191,7 @@ class _MetricsHandler(BaseHTTPRequestHandler):
     agent_id: str
     sandbox_type: str
     session_id: str = "default"
+    harness_info: dict[str, Any] = {}
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
         pass
@@ -263,6 +264,7 @@ class _MetricsHandler(BaseHTTPRequestHandler):
             "/activity": self._handle_activity,
             "/sessions": self._handle_sessions,
             "/registry": self._handle_registry,
+            "/harness": self._handle_harness,
             "/ui": self._handle_ui,
             "/ui/activity": self._handle_ui_activity,
             "/": self._handle_root,
@@ -392,6 +394,16 @@ class _MetricsHandler(BaseHTTPRequestHandler):
                 })
         self._send_json(result)
 
+    def _handle_harness(self) -> None:
+        """Return harness configuration info (skills, rules, hooks, subagents)."""
+        info = self.harness_info if isinstance(self.harness_info, dict) else {}
+        self._send_json({
+            "skills": info.get("skills", []),
+            "rules": info.get("rules", []),
+            "hooks": info.get("hooks", []),
+            "subagents": info.get("subagents", []),
+        })
+
     def _handle_ui(self) -> None:
         self._send_html(_DASHBOARD_HTML)
 
@@ -507,6 +519,7 @@ def start_metrics_server(
     sandbox_type: str = "docker",
     session_name: str = "",
     session_id: str = "",
+    harness_info: dict[str, Any] | None = None,
 ) -> tuple[HTTPServer, int]:
     """Start a background metrics HTTP aggregator server.
 
@@ -519,6 +532,8 @@ def start_metrics_server(
         sandbox_type: Sandbox type for health checks.
         session_name: Human-readable label for the UI session selector.
         session_id: Unique session identifier (auto-generated if empty).
+        harness_info: Dict with keys ``skills``, ``rules``, ``hooks``,
+            ``subagents`` — each a list of name strings or info dicts.
 
     Returns:
         Tuple of (running HTTPServer, actual_port_bound).
@@ -536,6 +551,7 @@ def start_metrics_server(
     _MetricsHandler.agent_id = agent_id
     _MetricsHandler.sandbox_type = sandbox_type
     _MetricsHandler.session_id = sid
+    _MetricsHandler.harness_info = harness_info or {}
 
     host = os.environ.get("HARNESS_MONITORING_HOST", "127.0.0.1")
     server = HTTPServer((host, port), _MetricsHandler)
