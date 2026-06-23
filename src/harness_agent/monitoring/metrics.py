@@ -6,6 +6,8 @@ See: docs/guides/plans/07-monitoring.md §7.3
 
 from __future__ import annotations
 
+from collections import deque
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -64,11 +66,15 @@ class AgentMetrics:
 
     # Latency accumulators
     total_latency_ms: float = 0.0
-    tool_latencies: list[float] = field(default_factory=list)
-    model_latencies: list[float] = field(default_factory=list)
+    tool_latencies: deque[float] = field(default_factory=lambda: deque(maxlen=100))
+    model_latencies: deque[float] = field(default_factory=lambda: deque(maxlen=100))
+    latency_window: int = field(default=100, repr=False)
 
-    # Rolling window cap for latency lists
-    _max_latency_window: int = field(default=100, repr=False)
+    def __post_init__(self) -> None:
+        """Re-create deques if a custom latency_window was provided."""
+        if self.latency_window != 100:
+            self.tool_latencies = deque(self.tool_latencies, maxlen=self.latency_window)
+            self.model_latencies = deque(self.model_latencies, maxlen=self.latency_window)
 
     # ------------------------------------------------------------------
     # Computed properties — the 9 key metrics
@@ -318,14 +324,12 @@ class AgentMetrics:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _append_latency(self, target: list[float], value: float) -> None:
-        """Append a latency value, respecting the rolling window cap."""
+    def _append_latency(self, target: deque[float], value: float) -> None:
+        """Append a latency value (deque handles maxlen cap automatically)."""
         target.append(value)
-        if len(target) > self._max_latency_window:
-            target.pop(0)
 
     @staticmethod
-    def _percentile(data: list[float], percentile: float) -> float:
+    def _percentile(data: Sequence[float], percentile: float) -> float:
         """Compute a percentile from a list of values.
 
         Uses linear interpolation between the two closest ranks.

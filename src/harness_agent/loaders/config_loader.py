@@ -15,7 +15,6 @@ from typing import Any, Literal
 
 import yaml
 
-
 # ── Default Middleware Order ──────────────────────────────────────────────
 # When middleware_order is empty in config, HarnessBuilder uses this default
 # 5-layer order. Source: docs/deep-agents/03-middleware.md
@@ -252,7 +251,7 @@ class ConfigLoader:
             return HarnessConfig(source_path=str(self.config_path))
 
         try:
-            with open(self.config_path, "r") as f:
+            with open(self.config_path, "r", encoding="utf-8") as f:
                 raw = yaml.safe_load(f) or {}
         except yaml.YAMLError as e:
             raise ConfigParseError(

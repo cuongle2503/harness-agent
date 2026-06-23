@@ -8,6 +8,7 @@ See: docs/guides/plans/07-monitoring.md §7.4
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -171,9 +172,7 @@ class AlertEvaluator:
         Returns:
             List of newly-fired Alerts (may be empty).
         """
-        import time as _time
-
-        now = _time.monotonic()
+        now = time.monotonic()
         fired: list[Alert] = []
 
         for rule in self.rules:
@@ -192,8 +191,8 @@ class AlertEvaluator:
                         severity=rule.severity,
                         current_value=round(current, 4),
                         threshold=rule.threshold,
-                        timestamp_iso=_time.strftime(
-                            "%Y-%m-%dT%H:%M:%SZ", _time.gmtime()
+                        timestamp_iso=time.strftime(
+                            "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
                         ),
                     )
                 )

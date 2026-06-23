@@ -23,7 +23,7 @@ def create_research_agent(
     *,
     backend: CompositeBackend | None = None,
     store: Any = None,
-) -> CompiledStateGraph:  # type: ignore[type-arg]
+) -> CompiledStateGraph:  # type: ignore[type-arg]  # CompiledStateGraph is generic
     """Create a research agent with web search and URL fetching.
 
     Per ADR-004, the researcher subagent uses deepseek-v4-flash,
@@ -61,8 +61,8 @@ def create_research_agent(
     }
 
     middleware: list[AgentMiddleware] = [
-        TodoListMiddleware(),  # type: ignore[list-item]
-        FilesystemMiddleware(backend=effective_backend),  # type: ignore[list-item]
+        TodoListMiddleware(),  # type: ignore[list-item]  # deep-agent middleware protocol
+        FilesystemMiddleware(backend=effective_backend),  # type: ignore[list-item]  # deep-agent middleware protocol
         SubAgentMiddleware(
             backend=effective_backend,
             subagents=[researcher_subagent],

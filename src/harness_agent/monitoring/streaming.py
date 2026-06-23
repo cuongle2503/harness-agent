@@ -64,8 +64,6 @@ def _classify_event(mode: str, data: Any) -> StreamEvent | None:
     Returns None for unrecognized modes.
     """
     if mode == "messages":
-        token: Any
-        metadata: dict[str, Any]
         if isinstance(data, tuple):
             token, metadata = data
         else:

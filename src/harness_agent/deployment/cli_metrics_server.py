@@ -18,9 +18,11 @@ Usage::
 from __future__ import annotations
 
 import atexit
+import contextlib
 import json
 import os
 import threading
+import time
 import types
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -53,6 +55,22 @@ _ACTIVITY_HTML: str = _load_static_html("activity.html")
 _MAX_TOOL_HISTORY = 100
 _MAX_ACTIVITY = 200
 
+_METRICS_FIELD_MAP: dict[str, str] = {
+    "model_calls": "model_calls",
+    "model_errors": "model_errors",
+    "token_usage_total": "total_tokens",
+    "input_tokens": "input_tokens",
+    "output_tokens": "output_tokens",
+    "tool_calls": "tool_calls",
+    "tool_errors": "tool_errors",
+    "total_tasks": "total_tasks",
+    "completed_tasks": "completed_tasks",
+    "subagent_spawn_count": "subagent_spawns",
+    "subagent_completes": "subagent_completes",
+    "hitl_approvals": "hitl_approvals",
+    "hitl_rejections": "hitl_rejections",
+}
+
 _sessions: dict[str, dict[str, Any]] = {}
 _sessions_lock = threading.Lock()
 
@@ -60,13 +78,12 @@ _sessions_lock = threading.Lock()
 def _get_or_create_session(session_id: str) -> dict[str, Any]:
     """Get or create a session data bag (not thread-safe — caller must lock)."""
     if session_id not in _sessions:
-        import time as _t0
         _sessions[session_id] = {
             "session_id": session_id,
             "name": session_id,
             "agent_id": session_id,
             "pid": os.getpid(),
-            "started_at": _t0.time(),
+            "started_at": time.time(),
             "metrics": AgentMetrics(),
             "tool_history": [],
             "activity_log": [],
@@ -91,7 +108,6 @@ def record_tool_history(
     session_id: str = "default",
 ) -> None:
     """Record a tool call to the shared history (called by CLI agent)."""
-    import time as _t
     with _sessions_lock:
         s = _get_or_create_session(session_id)
         s["tool_history"].append({
@@ -100,7 +116,7 @@ def record_tool_history(
             "output": output_str[:500],
             "latency_ms": round(latency_ms, 2),
             "success": success,
-            "timestamp": _t.time(),
+            "timestamp": time.time(),
         })
         if len(s["tool_history"]) > _MAX_TOOL_HISTORY:
             s["tool_history"].pop(0)
@@ -113,10 +129,9 @@ def record_activity(
     **kwargs: Any,
 ) -> None:
     """Record an activity event (called by CLI agent)."""
-    import time as _tt
     with _sessions_lock:
         s = _get_or_create_session(session_id)
-        entry: dict[str, Any] = {"type": event_type, "time": _tt.monotonic()}
+        entry: dict[str, Any] = {"type": event_type, "time": time.monotonic()}
         entry.update(kwargs)
         s["activity_log"].append(entry)
         if len(s["activity_log"]) > _MAX_ACTIVITY:
@@ -130,7 +145,6 @@ def record_session(
     **kwargs: Any,
 ) -> None:
     """Upsert per-thread metrics within a CLI session."""
-    import time as _ttt
     with _sessions_lock:
         s = _get_or_create_session(session_id)
         sm = s["session_metrics"]
@@ -143,7 +157,7 @@ def record_session(
                 "api_calls": 0,
                 "tool_calls": 0,
                 "turns": 0,
-                "created_at": _ttt.time(),
+                "created_at": time.time(),
             }
             sm[thread_id] = sess
         for key, value in kwargs.items():
@@ -151,7 +165,7 @@ def record_session(
                 sess[key] = sess.get(key, 0) + int(value)
             else:
                 sess[key] = value
-        sess["last_active"] = _ttt.monotonic()
+        sess["last_active"] = time.monotonic()
 
 
 def register_session(session_id: str, name: str, agent_id: str, pid: int = 0) -> None:
@@ -243,8 +257,7 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         return ids[0] if ids else "default"
 
     def _uptime(self) -> float:
-        import time as _time
-        return _time.monotonic() - self.start_time
+        return time.monotonic() - self.start_time
 
     def _get_session(self, session_id: str) -> dict[str, Any]:
         with _sessions_lock:
@@ -353,10 +366,8 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         s = self._get_session(sid)
         history = s.get("tool_history", []) if s else []
         count = 20
-        try:
+        with contextlib.suppress(ValueError):
             count = int(self._query_param("count", "20"))
-        except ValueError:
-            pass
         self._send_json(history[-count:])
 
     def _handle_activity(self) -> None:
@@ -364,10 +375,8 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         s = self._get_session(sid)
         log = s.get("activity_log", []) if s else []
         count = 50
-        try:
+        with contextlib.suppress(ValueError):
             count = int(self._query_param("count", "50"))
-        except ValueError:
-            pass
         self._send_json(log[-count:])
 
     def _handle_sessions(self) -> None:
@@ -511,23 +520,7 @@ class _MetricsHandler(BaseHTTPRequestHandler):
             s = _get_or_create_session(sid)
             metrics_data = body.get("metrics", {})
             m = s["metrics"]
-            # Map to_dict() keys → internal attribute names (some are properties)
-            _FIELD_MAP = {
-                "model_calls": "model_calls",
-                "model_errors": "model_errors",
-                "token_usage_total": "total_tokens",
-                "input_tokens": "input_tokens",
-                "output_tokens": "output_tokens",
-                "tool_calls": "tool_calls",
-                "tool_errors": "tool_errors",
-                "total_tasks": "total_tasks",
-                "completed_tasks": "completed_tasks",
-                "subagent_spawn_count": "subagent_spawns",
-                "subagent_completes": "subagent_completes",
-                "hitl_approvals": "hitl_approvals",
-                "hitl_rejections": "hitl_rejections",
-            }
-            for dict_key, attr_name in _FIELD_MAP.items():
+            for dict_key, attr_name in _METRICS_FIELD_MAP.items():
                 val = metrics_data.get(dict_key, 0)
                 if val:
                     setattr(m, attr_name, getattr(m, attr_name, 0) + int(val))

@@ -155,14 +155,13 @@ class _MetricsCallback(BaseCallbackHandler):
         self, serialized: dict[str, Any], input_str: str, *,
         run_id: UUID, **kwargs: Any,
     ) -> None:
-        import time as _t
         tool_name = serialized.get("name", "unknown")
         self.tool_call_count += 1
-        self._tool_starts[run_id] = (_t.monotonic(), tool_name, input_str)
+        self._tool_starts[run_id] = (_time_module.monotonic(), tool_name, input_str)
         _activity_log.append({
             "type": "tool_start", "name": tool_name,
             "input": input_str[:200] if input_str else "",
-            "time": _t.time(),
+            "time": _time_module.time(),
         })
         if len(_activity_log) > _MAX_HISTORY:
             _activity_log.pop(0)
@@ -170,11 +169,10 @@ class _MetricsCallback(BaseCallbackHandler):
     def on_tool_end(
         self, output: Any, *, run_id: UUID, **kwargs: Any,
     ) -> None:
-        import time as _t
         entry = self._tool_starts.pop(run_id, None)
         if entry is not None:
             t0, tool_name, input_str = entry
-            elapsed_ms = (_t.monotonic() - t0) * 1000
+            elapsed_ms = (_time_module.monotonic() - t0) * 1000
             output_str = str(output)[:500] if output else ""
             self._metrics.record_tool_call(
                 tool_name, elapsed_ms, success=True
@@ -185,7 +183,7 @@ class _MetricsCallback(BaseCallbackHandler):
                 "output": output_str,
                 "latency_ms": round(elapsed_ms, 2),
                 "success": True,
-                "timestamp": _t.time(),
+                "timestamp": _time_module.time(),
             })
             if len(_tool_history) > _MAX_HISTORY:
                 _tool_history.pop(0)
@@ -193,7 +191,7 @@ class _MetricsCallback(BaseCallbackHandler):
                 "type": "tool_end", "name": tool_name,
                 "output": output_str[:200],
                 "latency_ms": round(elapsed_ms, 2),
-                "success": True, "time": _t.time(),
+                "success": True, "time": _time_module.time(),
             })
             if len(_activity_log) > _MAX_HISTORY:
                 _activity_log.pop(0)
@@ -201,11 +199,10 @@ class _MetricsCallback(BaseCallbackHandler):
     def on_tool_error(
         self, error: BaseException, *, run_id: UUID, **kwargs: Any,
     ) -> None:
-        import time as _t
         entry = self._tool_starts.pop(run_id, None)
         if entry is not None:
             t0, tool_name, input_str = entry
-            elapsed_ms = (_t.monotonic() - t0) * 1000
+            elapsed_ms = (_time_module.monotonic() - t0) * 1000
             self._metrics.record_tool_call(
                 tool_name, elapsed_ms, success=False
             )
@@ -215,7 +212,7 @@ class _MetricsCallback(BaseCallbackHandler):
                 "output": str(error)[:500],
                 "latency_ms": round(elapsed_ms, 2),
                 "success": False,
-                "timestamp": _t.time(),
+                "timestamp": _time_module.time(),
             })
             if len(_tool_history) > _MAX_HISTORY:
                 _tool_history.pop(0)
@@ -223,7 +220,7 @@ class _MetricsCallback(BaseCallbackHandler):
                 "type": "tool_end", "name": tool_name,
                 "output": str(error)[:200],
                 "latency_ms": round(elapsed_ms, 2),
-                "success": False, "time": _t.time(),
+                "success": False, "time": _time_module.time(),
             })
             if len(_activity_log) > _MAX_HISTORY:
                 _activity_log.pop(0)
@@ -253,8 +250,7 @@ def create_server_app(
     # Extract to local so mypy can narrow the non-None type
     model_sel = cfg.model_selection
 
-    import time as _time_module_inner
-    _server_start_time = _time_module_inner.monotonic()
+    _server_start_time = _time_module.monotonic()
     _memory_store: dict[str, Any] = {}
     _server_event_bus = EventBus()
 
@@ -504,7 +500,6 @@ def create_server_app(
         actual_tool_calls = metrics_callback.tool_call_count
         sess = _session_metrics.get(thread_id)
         if sess is None:
-            import time as _time_session
             sess = {
                 "thread_id": thread_id,
                 "input_tokens": 0,
@@ -512,7 +507,7 @@ def create_server_app(
                 "api_calls": 0,
                 "tool_calls": 0,
                 "turns": 0,
-                "created_at": _time_session.time(),
+                "created_at": _time_module.time(),
             }
             _session_metrics[thread_id] = sess
         sess["input_tokens"] += int(tokens_input)

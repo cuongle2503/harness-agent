@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import glob as glob_module
 import logging
+import os
 import re
 import shlex
 import subprocess
@@ -27,7 +28,9 @@ logger = logging.getLogger(__name__)
 # Helper
 # ---------------------------------------------------------------------------
 
-_WORKSPACE = Path.cwd().resolve()
+_WORKSPACE = Path(
+    os.environ.get("HARNESS_WORKSPACE_ROOT", str(Path.cwd()))
+).resolve()
 
 
 def _safe_path(file_path: str) -> Path:

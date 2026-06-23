@@ -28,8 +28,8 @@ class TestAgentMetricsDefaults:
 
     def test_latency_lists_start_empty(self) -> None:
         m = AgentMetrics()
-        assert m.tool_latencies == []
-        assert m.model_latencies == []
+        assert len(m.tool_latencies) == 0
+        assert len(m.model_latencies) == 0
 
     def test_total_latency_ms_starts_at_zero(self) -> None:
         m = AgentMetrics()
@@ -54,7 +54,7 @@ class TestAgentMetricsRecording:
     def test_record_tool_call_adds_to_latency_list(self) -> None:
         m = AgentMetrics()
         m.record_tool_call("search", 150.0, success=True)
-        assert m.tool_latencies == [150.0]
+        assert list(m.tool_latencies) == [150.0]
 
     def test_record_model_call_tracks_tokens(self) -> None:
         m = AgentMetrics()
@@ -259,8 +259,8 @@ class TestAgentMetricsReset:
         m = AgentMetrics()
         m.record_tool_call("a", 100.0, success=True)
         m.reset()
-        assert m.tool_latencies == []
-        assert m.model_latencies == []
+        assert len(m.tool_latencies) == 0
+        assert len(m.model_latencies) == 0
 
     def test_reset_zeros_latency_total(self) -> None:
         m = AgentMetrics()
@@ -294,17 +294,17 @@ class TestAgentMetricsLatencyWindow:
     """Tests for the rolling latency window."""
 
     def test_latency_window_respected(self) -> None:
-        m = AgentMetrics(_max_latency_window=3)
+        m = AgentMetrics(latency_window=3)
         m.record_tool_call("a", 1.0, success=True)
         m.record_tool_call("b", 2.0, success=True)
         m.record_tool_call("c", 3.0, success=True)
         m.record_tool_call("d", 4.0, success=True)
         # Only last 3 values retained
-        assert m.tool_latencies == [2.0, 3.0, 4.0]
+        assert list(m.tool_latencies) == [2.0, 3.0, 4.0]
 
     def test_model_latency_window_respected(self) -> None:
-        m = AgentMetrics(_max_latency_window=2)
+        m = AgentMetrics(latency_window=2)
         m.record_model_call(1.0, success=True)
         m.record_model_call(2.0, success=True)
         m.record_model_call(3.0, success=True)
-        assert m.model_latencies == [2.0, 3.0]
+        assert list(m.model_latencies) == [2.0, 3.0]

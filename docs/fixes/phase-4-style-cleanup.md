@@ -11,8 +11,8 @@
   - `src/harness_agent/deployment/server.py:157,172,203,502`
   - `src/harness_agent/monitoring/alerts.py:174`
 - **Fix**:
-  - [ ] Hoist `import time` lên module level
-  - [ ] Xóa các alias `_t`, `_t0`, `_ttt` — dùng `time` trực tiếp
+  - [x] Hoist `import time` lên module level
+  - [x] Xóa các alias `_t`, `_t0`, `_ttt` — dùng `time` trực tiếp
 
 ---
 
@@ -20,7 +20,7 @@
 
 - **File**: `src/harness_agent/security/permissions.py:148-149,155`
 - **Fix**:
-  - [ ] Move lên top of module
+  - [x] Move lên top of module
 
 ---
 
@@ -31,7 +31,7 @@
   - `src/harness_agent/loaders/config_loader.py:10`
   - `src/harness_agent/loaders/hook_loader.py:17,25`
 - **Fix**:
-  - [ ] `ruff check --fix src/harness_agent/loaders/`
+  - [x] `ruff check --fix src/harness_agent/loaders/`
 
 ---
 
@@ -41,7 +41,7 @@
   - `src/harness_agent/deployment/cli.py:1089`
   - `src/harness_agent/deployment/cli_metrics_server.py:354,365`
 - **Fix**:
-  - [ ] `with contextlib.suppress(ValueError):`
+  - [x] `with contextlib.suppress(ValueError):`
 
 ---
 
@@ -49,7 +49,7 @@
 
 - **File**: `src/harness_agent/deployment/cli_metrics_server.py:513`
 - **Fix**:
-  - [ ] Move ra module level
+  - [x] Move ra module level
 
 ---
 
@@ -58,7 +58,7 @@
 - **File**: `src/harness_agent/deployment/cli.py:1098`
 - **Issue**: `if name: session_id = name else: session_id = ...`
 - **Fix**:
-  - [ ] `session_id = name or f"{self.config.assistant_id}-{os.getpid()}"`
+  - [x] `session_id = name or f"{self.config.assistant_id}-{os.getpid()}"`
 
 ---
 
@@ -66,7 +66,7 @@
 
 - **File**: `src/harness_agent/__init__.py:12,20,27,43,53`
 - **Fix**:
-  - [ ] Xóa `noqa: E402, F401` — `__all__` đã handle
+  - [x] Xóa `noqa: E402, F401` — `__all__` đã handle
 
 ---
 
@@ -74,7 +74,7 @@
 
 - **File**: `src/harness_agent/loaders/config_loader.py:255`
 - **Fix**:
-  - [ ] `open(self.config_path, encoding="utf-8")`
+  - [x] `open(self.config_path, encoding="utf-8")`
 
 ---
 
@@ -82,7 +82,7 @@
 
 - **File**: `src/harness_agent/monitoring/streaming.py:67-68`
 - **Fix**:
-  - [ ] Xóa standalone `token: Any` và `metadata: dict[str, Any]` annotations
+  - [x] Xóa standalone `token: Any` và `metadata: dict[str, Any]` annotations
 
 ---
 
@@ -91,7 +91,7 @@
 - **File**: `src/harness_agent/monitoring/metrics.py:322-325`
 - **Issue**: O(n) trên mỗi append. Không critical ở window=100 nhưng sai data structure.
 - **Fix**:
-  - [ ] Dùng `collections.deque(maxlen=100)`
+  - [x] Dùng `collections.deque(maxlen=100)`
 
 ---
 
@@ -100,7 +100,7 @@
 - **File**: `src/harness_agent/evaluation/evaluator.py:134,170`
 - **Issue**: `pass_at_3 = completion_rate + 0.1` — không có cơ sở methodology.
 - **Fix**:
-  - [ ] Implement actual pass@3 (chạy 3 lần) hoặc xóa field
+  - [x] Implement actual pass@3 (chạy 3 lần) hoặc xóa field
 
 ---
 
@@ -108,7 +108,7 @@
 
 - **File**: `src/harness_agent/loaders/harness_builder.py:1`
 - **Fix**:
-  - [ ] Translate sang English cho consistency
+  - [x] Translate sang English cho consistency
 
 ---
 
@@ -117,7 +117,7 @@
 - **File**: `src/harness_agent/tools/basic_tools.py:29`
 - **Issue**: `Path.cwd()` tại import time. Nếu process đổi directory → security boundary sai.
 - **Fix**:
-  - [ ] Dùng `os.environ.get("HARNESS_WORKSPACE_ROOT", ...)` như `file_tools.py`
+  - [x] Dùng `os.environ.get("HARNESS_WORKSPACE_ROOT", ...)` như `file_tools.py`
 
 ---
 
@@ -126,8 +126,8 @@
 - **File**: `src/harness_agent/monitoring/metrics.py:205-244`
 - **Issue**: `subagent_name`, `tokens_before/after`, `tool_name` được nhận rồi discard.
 - **Fix**:
-  - [ ] Log tại DEBUG level hoặc store per-tool breakdown
-  - [ ] Hoặc xóa params nếu không cần
+  - [x] Log tại DEBUG level hoặc store per-tool breakdown
+  - [x] Hoặc xóa params nếu không cần
 
 ---
 
@@ -136,7 +136,7 @@
 - **File**: `src/harness_agent/security/permissions.py:47`
 - **Issue**: Default `Path.home() / "my-projects"` — machine-specific.
 - **Fix**:
-  - [ ] Default to `Path.cwd()` hoặc `os.environ.get("HARNESS_WORKSPACE")`
+  - [x] Default to `Path.cwd()` hoặc `os.environ.get("HARNESS_WORKSPACE")`
 
 ---
 
@@ -144,7 +144,7 @@
 
 - **File**: `src/harness_agent/config.py:141,154`
 - **Fix**:
-  - [ ] `validate_secrets()` gọi `validate()` internally
+  - [x] `validate_secrets()` gọi `validate()` internally
 
 ---
 
@@ -154,7 +154,7 @@
   - `src/harness_agent/agents/code_agent.py:27,64,65,67`
   - `src/harness_agent/agents/research_agent.py:26,64,65`
 - **Fix**:
-  - [ ] Thêm reason: `# type: ignore[return-value]  # CompiledStateGraph is generic`
+  - [x] Thêm reason: `# type: ignore[return-value]  # CompiledStateGraph is generic`
 
 ---
 
@@ -163,14 +163,14 @@
 - **File**: `src/harness_agent/memory/backends.py:42`
 - **Issue**: Commit `e69f749` set `virtual_mode=False` nhưng code hiện tại là `True`.
 - **Fix**:
-  - [ ] Verify intent theo ADR-003
-  - [ ] Set đúng giá trị và document why
+  - [x] Verify intent theo ADR-003
+  - [x] Set đúng giá trị và document why
 
 ---
 
 ## Checklist
 
-- [ ] `ruff check --fix` applied
-- [ ] `mypy` clean
-- [ ] All tests pass
-- [ ] Code đọc dễ hơn, ít noise hơn
+- [x] `ruff check --fix` applied
+- [x] `mypy` clean
+- [x] All tests pass
+- [x] Code đọc dễ hơn, ít noise hơn

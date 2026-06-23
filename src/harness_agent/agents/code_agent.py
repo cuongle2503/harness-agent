@@ -24,7 +24,7 @@ def create_code_agent(
     backend: CompositeBackend | None = None,
     store: Any = None,
     summarization_model: BaseChatModel | str = "deepseek-v4-flash",
-) -> CompiledStateGraph:  # type: ignore[type-arg]
+) -> CompiledStateGraph:  # type: ignore[type-arg]  # CompiledStateGraph is generic
     """Create a code agent with file manipulation and code execution.
 
     Per ADR-004, the coder subagent uses deepseek-v4-pro,
@@ -61,10 +61,10 @@ def create_code_agent(
     }
 
     middleware: list[AgentMiddleware] = [
-        TodoListMiddleware(),  # type: ignore[list-item]
-        FilesystemMiddleware(backend=effective_backend),  # type: ignore[list-item]
+        TodoListMiddleware(),  # type: ignore[list-item]  # deep-agent middleware protocol
+        FilesystemMiddleware(backend=effective_backend),  # type: ignore[list-item]  # deep-agent middleware protocol
         create_summarization_middleware(
-            model=summarization_model,  # type: ignore[arg-type]
+            model=summarization_model,  # type: ignore[arg-type]  # str|BaseChatModel accepted
             backend=effective_backend,
         ),
         SubAgentMiddleware(

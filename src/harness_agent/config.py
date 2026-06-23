@@ -154,9 +154,13 @@ class AgentModelSelection:
     def validate_secrets(self) -> None:
         """Validate that all required secrets are set at startup.
 
+        Calls validate() first for warnings, then raises if critical secrets
+        are missing.
+
         Raises:
             RuntimeError: If any required secrets are missing.
         """
+        self.validate()
         required = ["DEEPSEEK_API_KEY"]
         missing = [k for k in required if k not in os.environ]
         if missing:

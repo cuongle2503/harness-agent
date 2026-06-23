@@ -1,4 +1,4 @@
-"""Harness Builder — kết nối tất cả loaders thành agent từ .harness/.
+"""Harness Builder — assembles all loaders into an agent from .harness/.
 
 Plan: docs/guides/plans-phase-2/06-harness-builder.md
 """

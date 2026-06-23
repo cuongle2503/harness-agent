@@ -11,6 +11,8 @@ Limits file system access by path, preventing:
 
 from __future__ import annotations
 
+import fnmatch
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -44,7 +46,9 @@ class PermissionBoundary:
     """
 
     rules: list[PathPermission] = field(default_factory=list)
-    workspace_root: Path = field(default_factory=lambda: Path.home() / "my-projects")
+    workspace_root: Path = field(
+        default_factory=lambda: Path(os.environ.get("HARNESS_WORKSPACE", str(Path.cwd())))
+    )
 
     @classmethod
     def production(cls) -> PermissionBoundary:
@@ -145,14 +149,11 @@ def _path_matches(file_path: str, pattern: str) -> bool:
         from pathlib import PurePath
         return PurePath(file_path).is_relative_to(prefix)
     if pattern.endswith("*"):
-        # Match files in the same directory
-        import os
         dir_pattern = os.path.dirname(pattern)
         name_pattern = os.path.basename(pattern)
         file_dir = os.path.dirname(file_path)
         file_name = os.path.basename(file_path)
         if file_dir == dir_pattern or file_path.startswith(dir_pattern):
-            import fnmatch
             return fnmatch.fnmatch(file_name, name_pattern)
     return file_path == pattern
 

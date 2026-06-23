@@ -7,6 +7,7 @@ Supports shell commands, MCP server integration, and memory persistence.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import re as _re
@@ -1085,19 +1086,13 @@ class CLIAgent:
         port = self.config.monitoring_port
         env_port = os.environ.get("HARNESS_MONITORING_PORT")
         if env_port:
-            try:
+            with contextlib.suppress(ValueError):
                 port = int(env_port)
-            except ValueError:
-                pass
 
         name = self.config.session_name or os.environ.get(
             "HARNESS_SESSION_NAME", ""
         )
-        # Ensure unique session_id: use name if set, otherwise agent_id + short PID suffix
-        if name:
-            session_id = name
-        else:
-            session_id = f"{self.config.assistant_id}-{os.getpid()}"
+        session_id = name or f"{self.config.assistant_id}-{os.getpid()}"
 
         # No proxy for localhost — urllib may route through http_proxy otherwise
         _no_proxy = _ur.ProxyHandler({})

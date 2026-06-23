@@ -159,7 +159,7 @@ class AgentEvaluator:
         result.avg_latency_ms = total_latency / n if n > 0 else 0.0
         result.avg_token_usage = int(total_tokens / n) if n > 0 else 0
         result.pass_at_1 = result.task_completion_rate
-        result.pass_at_3 = min(1.0, result.task_completion_rate + 0.1)
+        result.pass_at_3 = result.task_completion_rate
 
         return result
 
