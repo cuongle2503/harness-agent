@@ -272,29 +272,34 @@ def skills_dir_with_files(temp_harness_dir):
 ## 7. Checklist
 
 ### Design
-- [ ] Skill file format spec (markdown structure) documented
-- [ ] Cơ chế tích hợp với `MemoryMiddleware.sources` rõ ràng
-- [ ] Skill name resolution rule (file stem = skill name)
-- [ ] Edge case table đầy đủ
+- [x] Skill file format spec (markdown structure) documented
+- [x] Cơ chế tích hợp với `MemoryMiddleware.sources` rõ ràng
+- [x] Skill name resolution rule (file stem = skill name)
+- [x] Edge case table đầy đủ
 
 ### Implementation
-- [ ] `SkillLoader.__init__` nhận `harness_dir: Path`
-- [ ] `SkillLoader.exists` property
-- [ ] `SkillLoader.get_memory_sources()` → `list[str]`
-- [ ] `SkillLoader.list_skills()` → `list[SkillInfo]`
-- [ ] `SkillInfo` class với `name`, `path`, `size`
-- [ ] Type hints đầy đủ
-- [ ] File < 100 lines
+- [x] `SkillLoader.__init__` nhận `harness_dir: Path`, lưu `self.harness_dir` + `self.skills_dir`
+- [x] `SkillLoader.exists` property
+- [x] `SkillLoader.get_memory_sources()` → `list[str]` (sorted absolute paths)
+- [x] `SkillLoader.list_skills()` → `list[SkillInfo]`
+- [x] `SkillInfo` class với `name`, `path`, `size` + `__eq__` + `__repr__`
+- [x] Type hints đầy đủ (`from __future__ import annotations`, tất cả public methods)
+- [x] File < 100 lines (96 lines — `src/harness_agent/loaders/skill_loader.py`)
 
 ### Testing
-- [ ] 9 unit tests
-- [ ] Fixtures cho temp `.harness/skills/`
-- [ ] Test glob pattern (`*.md` only)
-- [ ] Test absolute path conversion
-- [ ] Coverage ≥ 95%
+- [x] 16 unit tests (vượt kế hoạch 9), tổ chức thành 4 test classes:
+  - `TestSkillLoaderExists` (2 tests): `test_no_skills_dir`, `test_empty_skills_dir`
+  - `TestSkillLoaderGetMemorySources` (6 tests): `test_no_skills_dir_returns_empty`, `test_empty_skills_dir_returns_empty`, `test_single_skill`, `test_multiple_skills_sorted`, `test_ignores_non_md_files`, `test_absolute_paths`
+  - `TestSkillLoaderListSkills` (3 tests): `test_list_skills_returns_info`, `test_list_skills_empty_dir`, `test_list_skills_no_dir`
+  - `TestSkillInfo` (5 tests): `test_skill_name_from_stem`, `test_repr_format`, `test_equality`, `test_inequality`, `test_not_equal_to_other_type`
+- [x] Fixtures cho temp `.harness/skills/`
+- [x] Test glob pattern (`*.md` only)
+- [x] Test absolute path conversion
+- [x] Coverage ≥ 95% (đạt 100% — skill_loader.py: 28/28 statements)
 
 ### Integration
-- [ ] `SkillLoader` được import trong `src/harness_agent/loaders/__init__.py`
+- [x] `SkillLoader` và `SkillInfo` được import + export trong `src/harness_agent/loaders/__init__.py`
+- [x] Commit: `feat: implement SkillLoader for .harness/skills/*.md` (cb0697b)
 
 ---
 

@@ -13,6 +13,12 @@ from harness_agent.loaders.config_loader import (
 )
 from harness_agent.loaders.rule_loader import RuleInfo, RuleLoader
 from harness_agent.loaders.skill_loader import SkillInfo, SkillLoader
+from harness_agent.loaders.subagent_loader import (
+    MiddlewareResolver,
+    SubAgentInfo,
+    SubAgentLoadError,
+    SubAgentLoader,
+)
 
 __all__ = [
     "BackendConfig",
@@ -23,9 +29,13 @@ __all__ = [
     "FeaturesConfig",
     "HarnessConfig",
     "MiddlewareParamConfig",
+    "MiddlewareResolver",
     "RuleInfo",
     "RuleLoader",
     "SecurityConfig",
     "SkillInfo",
     "SkillLoader",
+    "SubAgentInfo",
+    "SubAgentLoadError",
+    "SubAgentLoader",
 ]

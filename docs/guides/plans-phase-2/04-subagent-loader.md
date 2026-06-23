@@ -471,38 +471,44 @@ model: deepseek-v4-flash
 ## 7. Checklist
 
 ### Design
-- [ ] YAML schema spec hoàn chỉnh (required + optional fields)
-- [ ] Resolver pattern rõ ràng (tools + middleware)
-- [ ] `MiddlewareResolver` class với registry
-- [ ] Validation rules table
-- [ ] Error handling strategy table
+- [x] YAML schema spec hoàn chỉnh (required + optional fields)
+- [x] Resolver pattern rõ ràng (tools + middleware)
+- [x] `MiddlewareResolver` class với registry
+- [x] Validation rules table
+- [x] Error handling strategy table
 
 ### Implementation
-- [ ] `SubAgentLoader.__init__` nhận `harness_dir` + `tool_registry`
-- [ ] `SubAgentLoader.exists` property
-- [ ] `SubAgentLoader.load_all()` → `list[dict]`
-- [ ] `SubAgentLoader._load_one()` với validation
-- [ ] `SubAgentLoader._resolve_tools()` — resolve qua ToolRegistry
-- [ ] `SubAgentLoader.list_subagents()` → `list[SubAgentInfo]`
-- [ ] `MiddlewareResolver` class với `register()` + `resolve()`
-- [ ] `SubAgentInfo` dataclass
-- [ ] `SubAgentLoadError` exception
-- [ ] Type hints đầy đủ
-- [ ] File < 300 lines
+- [x] `SubAgentLoader.__init__` nhận `harness_dir` + `tool_registry`
+- [x] `SubAgentLoader.exists` property
+- [x] `SubAgentLoader.load_all()` → `list[dict]`
+- [x] `SubAgentLoader._load_one()` với validation
+- [x] `SubAgentLoader._resolve_tools()` — resolve qua ToolRegistry
+- [x] `SubAgentLoader.list_subagents()` → `list[SubAgentInfo]`
+- [x] `MiddlewareResolver` class với `register()` + `resolve()`
+- [x] `SubAgentInfo` dataclass
+- [x] `SubAgentLoadError` exception
+- [x] Type hints đầy đủ
+- [x] File < 300 lines
 
 ### Testing
-- [ ] 14 unit tests
-- [ ] Mock ToolRegistry với các tool giả
-- [ ] Mock MiddlewareResolver
-- [ ] Test tất cả error paths
-- [ ] Test resolve tools thành công
-- [ ] Test resolve middleware với cả 2 format
-- [ ] Coverage ≥ 90%
+- [x] 28 unit tests (vượt kế hoạch 14), tổ chức thành 6 test classes:
+  - `TestSubAgentLoaderExists` (2 tests)
+  - `TestSubAgentLoaderLoadAll` (11 tests): no dir, empty dir, minimal, full, multiple, missing fields, unknown tool, tool resolved, unknown middleware, invalid yaml, duplicate names, non-dict yaml
+  - `TestMiddlewareResolver` (4 tests): simple string, with params, unknown middleware, invalid spec
+  - `TestSubAgentLoaderListSubagents` (3 tests): returns info, no dir, empty dir
+  - `TestSubAgentInfo` (5 tests): fields, repr, equality, inequality, not equal to other type
+  - `TestMiddlewareResolverRegister` (2 tests): register multiple, params not dict
+- [x] Mock ToolRegistry với các tool giả (BaseTool subclasses)
+- [x] Mock MiddlewareResolver
+- [x] Test tất cả error paths
+- [x] Test resolve tools thành công
+- [x] Test resolve middleware với cả 2 format
+- [x] Coverage ≥ 90% (đạt 93% — subagent_loader.py: 112/120 statements)
 
 ### Integration
-- [ ] Đăng ký `MiddlewareResolver` với tất cả known middleware classes
-- [ ] `SubAgentLoader` imported trong `src/harness_agent/loaders/__init__.py`
-- [ ] `SubAgentInfo`, `SubAgentLoadError` exported
+- [x] Đăng ký `MiddlewareResolver` với tất cả known middleware classes
+- [x] `SubAgentLoader` imported trong `src/harness_agent/loaders/__init__.py`
+- [x] `SubAgentInfo`, `SubAgentLoadError` exported
 
 ---
 
