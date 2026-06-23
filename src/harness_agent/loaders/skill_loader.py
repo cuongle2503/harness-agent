@@ -1,6 +1,9 @@
-"""Skill Loader — scan .harness/skills/*.md for MemoryMiddleware sources.
+"""Skill Loader — scan .harness/skills/ for skill definitions.
 
-Plan: docs/guides/plans-phase-2/02-skill-loader.md
+Supports three formats:
+1. Agent Skills spec: skills/<name>/SKILL.md (with YAML frontmatter)
+2. Flat markdown: skills/*.md
+3. YAML definitions: skills/*.yaml
 """
 
 from __future__ import annotations
@@ -113,6 +116,25 @@ def _extract_yaml_frontmatter(content: str) -> tuple[str, str]:
     return name, description
 
 
+def _extract_yaml_skill_info(path: Path) -> tuple[str, str]:
+    """Extract name and description from a YAML skill definition file.
+
+    Reads top-level ``name:`` and ``description:`` keys from a
+    standalone YAML file (not frontmatter-delimited).
+
+    Returns (name, description). Both may be empty strings.
+    """
+    import yaml
+
+    content = path.read_text(encoding="utf-8")
+    raw = yaml.safe_load(content)
+    if not isinstance(raw, dict):
+        return "", ""
+    name = str(raw.get("name", "")).strip().strip('"').strip("'")
+    description = str(raw.get("description", "")).strip().strip('"').strip("'")
+    return name, description
+
+
 class SkillLoader:
     """Scan .harness/skills/*.md and provide paths for MemoryMiddleware.
 
@@ -146,41 +168,42 @@ class SkillLoader:
         return self.skills_dir.is_dir()
 
     def get_memory_sources(self) -> list[str]:
-        """Return absolute paths of all skill directories.
+        """Return absolute paths of all skill files/directories.
 
-        Skills follow the Agent Skills specification:
-        each skill lives in its own subdirectory containing a
-        ``SKILL.md`` file (e.g. ``skills/code-review/SKILL.md``).
-
-        Returns the **directory** paths so ``create_deep_agent``
-        and ``SkillsMiddleware`` can scan them for skill files.
+        Supports three formats (checked in priority order):
+        1. Agent Skills spec: ``skills/<name>/SKILL.md``
+        2. Flat markdown: ``skills/*.md``
+        3. YAML skill definitions: ``skills/*.yaml``
 
         Returns:
-            List of absolute directory paths as strings. Empty list
-            if the skills directory does not exist or contains no
-            skill subdirectories.
+            List of absolute paths as strings. Empty list if the
+            skills directory does not exist or contains no skills.
         """
         if not self.exists:
             return []
-        # Return directories that contain a SKILL.md file
+        # Priority 1: directories that contain a SKILL.md file
         skill_dirs: list[str] = []
         for skill_md in sorted(self.skills_dir.glob("*/SKILL.md")):
             skill_dirs.append(str(skill_md.parent.resolve()))
-        # Fallback: also support flat *.md files for backward compatibility
-        if not skill_dirs:
-            for p in sorted(self.skills_dir.glob("*.md")):
-                skill_dirs.append(str(p.resolve()))
-        return skill_dirs
+        if skill_dirs:
+            return skill_dirs
+        # Priority 2: flat *.md files
+        md_files = sorted(self.skills_dir.glob("*.md"))
+        if md_files:
+            return [str(p.resolve()) for p in md_files]
+        # Priority 3: *.yaml skill definitions
+        yaml_files = sorted(self.skills_dir.glob("*.yaml"))
+        if yaml_files:
+            return [str(p.resolve()) for p in yaml_files]
+        return []
 
     def list_skills(self) -> list[SkillInfo]:
         """List information about all registered skills.
 
-        Follows the Agent Skills specification: skills live in
-        subdirectories as ``<name>/SKILL.md`` with YAML frontmatter
-        containing ``name`` and ``description``.
-
-        Falls back to flat ``*.md`` files with heading-based metadata
-        extraction for backward compatibility.
+        Supports three formats (checked in priority order):
+        1. Agent Skills spec: ``skills/<name>/SKILL.md``
+        2. Flat markdown: ``skills/*.md``
+        3. YAML definitions: ``skills/*.yaml``
 
         Returns:
             List of SkillInfo with name, path, size, and description.
@@ -210,12 +233,28 @@ class SkillLoader:
                 )
             )
 
-        # Fallback: flat *.md files (backward compatibility)
+        # Fallback 1: flat *.md files
         if not result:
             for p in sorted(self.skills_dir.glob("*.md")):
                 try:
                     content = p.read_text(encoding="utf-8")
                     name, description = _extract_skill_metadata(content)
+                except Exception:
+                    name, description = "", ""
+                result.append(
+                    SkillInfo(
+                        name=name or p.stem.replace("-", " ").title(),
+                        path=str(p.resolve()),
+                        size=p.stat().st_size,
+                        description=description,
+                    )
+                )
+
+        # Fallback 2: *.yaml skill definitions
+        if not result:
+            for p in sorted(self.skills_dir.glob("*.yaml")):
+                try:
+                    name, description = _extract_yaml_skill_info(p)
                 except Exception:
                     name, description = "", ""
                 result.append(
