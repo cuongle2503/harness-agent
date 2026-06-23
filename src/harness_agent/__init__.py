@@ -50,6 +50,18 @@ from harness_agent.security import (  # noqa: E402, F401
 )
 from harness_agent.tools.registry import ToolRegistry
 
+from harness_agent.loaders import (  # noqa: E402, F401
+    BackendConfig,
+    BackendRouteConfig,
+    ConfigLoader,
+    ConfigParseError,
+    DEFAULT_MIDDLEWARE_ORDER,
+    FeaturesConfig,
+    HarnessConfig,
+    MiddlewareParamConfig,
+    SecurityConfig,
+)
+
 __version__ = "0.2.0"
 
 __all__ = [
@@ -65,10 +77,17 @@ __all__ = [
     "AlertEvaluator",
     "AlertRule",
     "AlertSeverity",
+    "BackendConfig",
+    "BackendRouteConfig",
     "CLIAgent",
+    "ConfigLoader",
+    "ConfigParseError",
+    "DEFAULT_MIDDLEWARE_ORDER",
     "EvaluationResult",
+    "FeaturesConfig",
     "HITLApprovalDeniedError",
     "HarnessAgent",
+    "HarnessConfig",
     "HarnessError",
     "HealthDashboardResponse",
     "HumanInTheLoopMiddleware",
@@ -76,9 +95,11 @@ __all__ = [
     "LoggingConfig",
     "MemoryItem",
     "MetricsResponse",
+    "MiddlewareParamConfig",
     "PIIMiddleware",
     "PermissionBoundary",
     "SandboxConfig",
+    "SecurityConfig",
     "StreamingConfig",
     "StructuredLoggingMiddleware",
     "SubagentTimeoutError",
