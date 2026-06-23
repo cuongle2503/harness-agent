@@ -1,16 +1,17 @@
 """Configuration loaders for the harness agent."""
 
 from harness_agent.loaders.config_loader import (
+    DEFAULT_MIDDLEWARE_ORDER,
     BackendConfig,
     BackendRouteConfig,
     ConfigLoader,
     ConfigParseError,
-    DEFAULT_MIDDLEWARE_ORDER,
     FeaturesConfig,
     HarnessConfig,
     MiddlewareParamConfig,
     SecurityConfig,
 )
+from harness_agent.loaders.skill_loader import SkillInfo, SkillLoader
 
 __all__ = [
     "BackendConfig",
@@ -22,4 +23,6 @@ __all__ = [
     "HarnessConfig",
     "MiddlewareParamConfig",
     "SecurityConfig",
+    "SkillInfo",
+    "SkillLoader",
 ]
