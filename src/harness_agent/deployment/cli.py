@@ -1187,13 +1187,16 @@ class CLIAgent:
         """
         thread_id = config.get("configurable", {}).get("thread_id", "default")
 
-        # Emit llm_start for the Live Workflow UI
+        # Emit llm_start + rule_applied for the Live Workflow UI
         if self._bridge:
             self._bridge.activity(
                 "llm_start",
                 model=getattr(self._llm, "model_name", "?"),
                 thread=thread_id,
             )
+            # Rules are always loaded into system prompt every turn
+            if self._harness_rule_sources:
+                self._bridge.activity("rule_applied", name="rules")
 
         # Fire pre_llm_call hooks
         self._fire_hook(
@@ -1418,8 +1421,19 @@ class CLIAgent:
             indicator_shown: str | None = None  # "thinking" | "planning" | None
             text_streamed: bool = False  # track if any text was output this iteration
 
-            # Fire pre_llm_call hooks
+            # ── Emit llm_start + rule_applied for Live Workflow UI ──
             thread_id = config.get("configurable", {}).get("thread_id", "default")
+            if self._bridge:
+                self._bridge.activity(
+                    "llm_start",
+                    model=getattr(llm_with_tools, "model_name", "?"),
+                    thread=thread_id,
+                )
+                # Rules are always loaded into system prompt every turn
+                if self._harness_rule_sources:
+                    self._bridge.activity("rule_applied", name="rules")
+
+            # Fire pre_llm_call hooks
             self._fire_hook(
                 HookEvent.PRE_LLM_CALL,
                 {
@@ -1745,6 +1759,21 @@ class CLIAgent:
                 ),
             },
         )
+
+        # Emit initial harness state for Live Workflow UI
+        if self._bridge:
+            # Rules are "always-on" — loaded into system prompt every turn
+            if self._harness_rule_sources:
+                self._bridge.activity(
+                    "rule_applied",
+                    name=f"{len(self._harness_rule_sources)} rules active",
+                )
+            # Skills are available on-demand (progressive disclosure)
+            if self._harness_skill_sources:
+                self._bridge.activity(
+                    "skill_used",
+                    name=f"{len(self._harness_skill_sources)} skills available",
+                )
 
         success = True
         try:
