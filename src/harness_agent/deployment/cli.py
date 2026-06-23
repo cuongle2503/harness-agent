@@ -938,6 +938,20 @@ class CLIAgent:
             "- **execute_command** — Run shell commands (tests, lint, git, etc.)",
         ]
 
+        # Rules section — always-loaded constraints (every turn)
+        if self._harness_rule_sources:
+            parts.append("")
+            parts.append("## Rules (Always Active)")
+            parts.append(
+                "The following rules are **always loaded** into context "
+                "for every session and every turn. These are mandatory "
+                "constraints — never violate them."
+            )
+            parts.append("")
+            for rp in self._harness_rule_sources:
+                rule_name = Path(rp).stem.replace("-", " ").title()
+                parts.append(f"- **{rule_name}**")
+
         # Skills section — progressive disclosure (name+desc always visible)
         if self._harness_skill_sources:
             # Use SkillLoader to extract name + description metadata
