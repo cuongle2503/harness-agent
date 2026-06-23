@@ -35,14 +35,13 @@ from harness_agent.deployment.cli_metrics_server import (
     record_session,
     record_tool_history,
 )
-from harness_agent.loaders.config_loader import ConfigLoader, HarnessConfig
+from harness_agent.loaders.config_loader import HarnessConfig
 from harness_agent.loaders.harness_builder import HarnessBuilder
 from harness_agent.loaders.hook_loader import (
     EventBus,
     HookEvent,
     HookResult,
 )
-from harness_agent.loaders.skill_loader import SkillLoader
 from harness_agent.memory.hybrid_memory import HybridMemory
 from harness_agent.monitoring.metrics import AgentMetrics
 from harness_agent.prompts import load_prompt
@@ -848,13 +847,14 @@ class CLIAgent:
     def _init_agent(self) -> HarnessAgent:
         """Initialize the LangChain agent with tools and system prompt.
 
-        When ``.harness/`` is present and ``deepagents`` is available,
-        attempts to use ``HarnessBuilder.build()`` to create a full
-        ``CompiledStateGraph`` with MemoryMiddleware (progressive
-        disclosure for skills/rules) and SubAgentMiddleware (task tool).
+        When ``.harness/`` is present, uses ``HarnessBuilder.build()``
+        to create a full ``CompiledStateGraph`` with SkillsMiddleware
+        (progressive disclosure), MemoryMiddleware, and
+        SubAgentMiddleware. ``deepagents`` is a required dependency —
+        build failures propagate as fatal errors.
 
-        Falls back to ``HarnessAgent`` when ``deepagents`` is not
-        installed or ``.harness/`` is absent.
+        When ``.harness/`` is absent, falls back to ``HarnessAgent``
+        with built-in defaults.
 
         System prompt priority:
         1. ``CLIAgentConfig.system_prompt`` (CLI flag)
@@ -863,51 +863,28 @@ class CLIAgent:
         3. ``HarnessBuilder.get_system_prompt()`` (when .harness/ present)
         4. Built-in ``load_prompt("main_agent")``
         """
-        # ── Try HarnessBuilder.build() for full middleware support ──
+        # ── HarnessBuilder.build() for full middleware support ──
         if self._harness_builder is not None:
-            try:
-                # Pass the already-initialized LLM so build() doesn't
-                # need to create a new one (avoids API key issues).
-                self._graph = self._harness_builder.build(model=self._llm)
-                # Return a lightweight HarnessAgent wrapper for backward
-                # compatibility — _stream_turn detects self._graph and
-                # uses astream_events() instead of manual LLM loop.
-                from harness_agent.tools.basic_tools import BASIC_TOOLS
-                return HarnessAgent(
-                    llm=self._llm,
-                    tools=BASIC_TOOLS,
-                    system_prompt=self._harness_builder.get_system_prompt(),
-                    max_tool_iterations=self.config.max_tool_iterations,
-                )
-            except Exception as e:
-                print(
-                    f"\n  {Color.warn(f'⚠ HarnessBuilder.build() failed: {e}')}"
-                )
-                fallback_msg = (
-                    "Falling back to HarnessAgent "
-                    "(no MemoryMiddleware/SubAgentMiddleware)."
-                )
-                print(f"  {Color.dim(fallback_msg)}")
-                self._graph = None  # Ensure graph is None for fallback
-
-        # ── Resolve base system prompt ──
-        system_prompt = self.config.system_prompt
-
-        if not system_prompt and self._harness_builder is not None:
-            system_prompt = self._harness_builder.get_system_prompt()
-
-        if not system_prompt and self._harness_config:
-            project_root = Path(self.config.project_root)
-            loader = ConfigLoader(project_root / ".harness")
-            system_prompt = loader.load_system_prompt(
-                self._harness_config, project_root
+            # Pass the already-initialized LLM so build() doesn't
+            # need to create a new one (avoids API key issues).
+            self._graph = self._harness_builder.build(model=self._llm)
+            # Return a lightweight HarnessAgent wrapper for backward
+            # compatibility — _stream_turn detects self._graph and
+            # uses astream_events() instead of manual LLM loop.
+            # SkillsMiddleware handles skill progressive disclosure;
+            # do NOT duplicate skill listings in the system prompt.
+            from harness_agent.tools.basic_tools import BASIC_TOOLS
+            return HarnessAgent(
+                llm=self._llm,
+                tools=BASIC_TOOLS,
+                system_prompt=self._harness_builder.get_system_prompt(),
+                max_tool_iterations=self.config.max_tool_iterations,
             )
 
+        # ── No .harness/ — use built-in defaults ──
+        system_prompt = self.config.system_prompt
         if not system_prompt:
-            if self._harness_config is not None:
-                system_prompt = self._build_harness_system_prompt()
-            else:
-                system_prompt = load_prompt("main_agent")
+            system_prompt = load_prompt("main_agent")
 
         from harness_agent.tools.basic_tools import BASIC_TOOLS
 
@@ -954,26 +931,10 @@ class CLIAgent:
                 rule_name = Path(rp).stem.replace("-", " ").title()
                 parts.append(f"- **{rule_name}**")
 
-        # Skills section — progressive disclosure (name+desc always visible)
-        if self._harness_skill_sources:
-            # Use SkillLoader to extract name + description metadata
-            project_root = Path(self.config.project_root)
-            skill_loader = SkillLoader(project_root / ".harness")
-            skill_list = skill_loader.list_skills()
-            if skill_list:
-                parts.append("")
-                parts.append("## Available Skills")
-                parts.append(
-                    "These skills are **always available**. When a task "
-                    "matches a skill's description below, follow its "
-                    "instructions precisely. Skills provide step-by-step "
-                    "workflows for specific tasks."
-                )
-                parts.append("")
-                for sk in skill_list:
-                    name = sk.name or sk.path
-                    desc = sk.description or "No description available"
-                    parts.append(f"- **{name}**: {desc}")
+        # Skills are handled by SkillsMiddleware (progressive disclosure).
+        # Do NOT duplicate skill listings here — SkillsMiddleware injects
+        # name + description at startup and loads full instructions on
+        # activation.
 
         # Subagents section — only list what's actually configured
         if self._harness_subagent_defs:

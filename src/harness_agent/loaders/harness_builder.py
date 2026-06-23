@@ -459,9 +459,10 @@ class HarnessBuilder:
     def _build_default_system_prompt(self) -> str:
         """Build a default system prompt that includes harness components.
 
-        Lists available skills with name + description so the LLM
-        knows what procedural workflows are available and can invoke
-        them when the task matches.
+        Skill discovery is handled by SkillsMiddleware (progressive
+        disclosure): name + description are injected into the system
+        prompt at startup, full instructions load on activation.
+        Do NOT duplicate skill listings here.
         """
         parts: list[str] = [
             "You are a helpful AI assistant.",
@@ -474,28 +475,12 @@ class HarnessBuilder:
             "",
             "## Workflow",
             "1. Analyze the user's request",
-            "2. Check if any available skill below matches the task",
+            "2. Check if any available skill matches the task",
             "3. If a skill matches, follow its instructions precisely",
             "4. Plan the approach using write_todos if needed",
             "5. Execute using tools or delegate to subagents",
             "6. Synthesize results and respond clearly",
         ]
-
-        # ── Available Skills ──────────────────────────────────────
-        skill_list = self.skill_loader.list_skills()
-        if skill_list:
-            parts.append("")
-            parts.append("## Available Skills")
-            parts.append(
-                "When a user request matches a skill's description, "
-                "follow that skill's instructions exactly. Skills "
-                "provide step-by-step workflows for specific tasks."
-            )
-            parts.append("")
-            for sk in skill_list:
-                name = sk.name or sk.path
-                desc = sk.description or "No description"
-                parts.append(f"- **{name}**: {desc}")
 
         # ── Available Subagents ────────────────────────────────────
         subagent_list = self.subagent_loader.list_subagents()
