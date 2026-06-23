@@ -11,6 +11,7 @@ from harness_agent.loaders.config_loader import (
     MiddlewareParamConfig,
     SecurityConfig,
 )
+from harness_agent.loaders.rule_loader import RuleInfo, RuleLoader
 from harness_agent.loaders.skill_loader import SkillInfo, SkillLoader
 
 __all__ = [
@@ -22,6 +23,8 @@ __all__ = [
     "FeaturesConfig",
     "HarnessConfig",
     "MiddlewareParamConfig",
+    "RuleInfo",
+    "RuleLoader",
     "SecurityConfig",
     "SkillInfo",
     "SkillLoader",

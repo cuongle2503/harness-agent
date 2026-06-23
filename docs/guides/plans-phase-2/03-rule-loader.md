@@ -328,30 +328,35 @@ def rules_dir_with_nesting(temp_harness_dir):
 ## 7. Checklist
 
 ### Design
-- [ ] Rule vs Skill distinction rõ ràng
-- [ ] Rule file format spec documented
-- [ ] Cơ chế tích hợp với `MemoryMiddleware.sources` rõ ràng
-- [ ] Precedence/conflict resolution rules defined
-- [ ] Edge case table đầy đủ
+- [x] Rule vs Skill distinction rõ ràng
+- [x] Rule file format spec documented
+- [x] Cơ chế tích hợp với `MemoryMiddleware.sources` rõ ràng
+- [x] Precedence/conflict resolution rules defined
+- [x] Edge case table đầy đủ
 
 ### Implementation
-- [ ] `RuleLoader.__init__` nhận `harness_dir: Path`
-- [ ] `RuleLoader.exists` property
-- [ ] `RuleLoader.get_memory_sources()` → `list[str]` (dùng `rglob`)
-- [ ] `RuleLoader.list_rules()` → `list[RuleInfo]`
-- [ ] `RuleInfo` class với `name`, `relative_path`, `size`
-- [ ] Type hints đầy đủ
-- [ ] File < 100 lines
+- [x] `RuleLoader.__init__` nhận `harness_dir: Path`
+- [x] `RuleLoader.exists` property
+- [x] `RuleLoader.get_memory_sources()` → `list[str]` (dùng `rglob`)
+- [x] `RuleLoader.list_rules()` → `list[RuleInfo]`
+- [x] `RuleInfo` class với `name`, `relative_path`, `size`
+- [x] Type hints đầy đủ
+- [x] File ~100 lines (102 lines — `src/harness_agent/loaders/rule_loader.py`)
 
 ### Testing
-- [ ] 11 unit tests
-- [ ] Fixtures cho temp `.harness/rules/` với nesting
-- [ ] Test `rglob` recursive behavior
-- [ ] Test relative_path trong nested dirs
-- [ ] Coverage ≥ 95%
+- [x] 20 unit tests (vượt kế hoạch 11), tổ chức thành 5 test classes:
+  - `TestRuleLoaderExists` (2 tests): `test_no_rules_dir`, `test_empty_rules_dir`
+  - `TestRuleLoaderGetMemorySources` (9 tests): `test_no_rules_dir_returns_empty`, `test_empty_rules_dir_returns_empty`, `test_single_rule`, `test_multiple_rules_flat`, `test_nested_rules`, `test_ignores_non_md_files`, `test_sorted_output`, `test_absolute_paths`, `test_deeply_nested_rules`
+  - `TestRuleLoaderListRules` (4 tests): `test_list_rules_returns_info`, `test_list_rules_empty_dir`, `test_list_rules_no_dir`, `test_list_rules_shows_nested_path`
+  - `TestRuleInfo` (5 tests): `test_rule_name_from_stem`, `test_repr_format`, `test_equality`, `test_inequality`, `test_not_equal_to_other_type`
+- [x] Fixtures cho temp `.harness/rules/` với nesting (3 fixtures: `rules_dir_flat`, `rules_dir_with_nesting`, `rules_dir_deeply_nested`)
+- [x] Test `rglob` recursive behavior
+- [x] Test relative_path trong nested dirs
+- [x] Coverage ≥ 95% (đạt 100% — rule_loader.py: 28/28 statements)
 
 ### Integration
-- [ ] `RuleLoader` được import trong `src/harness_agent/loaders/__init__.py`
+- [x] `RuleLoader` và `RuleInfo` được import + export trong `src/harness_agent/loaders/__init__.py`
+- [x] Commit: `feat: implement RuleLoader for .harness/rules/**/*.md`
 
 ---
 
