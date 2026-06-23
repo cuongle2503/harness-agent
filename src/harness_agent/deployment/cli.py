@@ -720,8 +720,8 @@ class CLIAgent:
         # ── Initialize components (may use harness overrides) ──
         self._llm = self._init_llm()
         self._sandbox = self._init_sandbox()
-        self._agent = self._init_agent()
         self._graph: Any = None  # CompiledStateGraph from HarnessBuilder
+        self._agent = self._init_agent()  # may set self._graph via HarnessBuilder.build()
         self._memory = HybridMemory()
         self._metrics = AgentMetrics()
         self._start_time = time.monotonic()

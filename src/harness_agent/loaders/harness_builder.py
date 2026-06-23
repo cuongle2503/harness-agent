@@ -485,6 +485,22 @@ class HarnessBuilder:
                 desc = sk.description or "No description"
                 parts.append(f"- **{name}**: {desc}")
 
+        # ── Available Subagents ────────────────────────────────────
+        subagent_list = self.subagent_loader.list_subagents()
+        if subagent_list:
+            parts.append("")
+            parts.append("## Available Subagents")
+            parts.append(
+                "Use the `task` tool with `subagent_type` set to one "
+                "of the names below to delegate work. Each subagent "
+                "runs in an isolated context with its own tools."
+            )
+            parts.append("")
+            for sa in subagent_list:
+                name = sa.name or "unnamed"
+                desc = sa.description or "No description"
+                parts.append(f"- **{name}**: {desc}")
+
         # ── Quality Standards ─────────────────────────────────────
         parts.extend([
             "",
