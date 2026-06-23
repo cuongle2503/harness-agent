@@ -273,9 +273,9 @@ class TestHarnessBuilderBuild:
 
         assert agent is not None
         call_kwargs = mock_create.call_args.kwargs
-        assert call_kwargs["skills"] is not None
-        assert len(call_kwargs["skills"]) == 1
-        assert "test-skill.md" in call_kwargs["skills"][0]
+        assert call_kwargs["memory"] is not None
+        assert len(call_kwargs["memory"]) == 1
+        assert "test-skill.md" in call_kwargs["memory"][0]
 
     @mock.patch("harness_agent.loaders.harness_builder.create_deep_agent")
     def test_build_with_rules(
@@ -353,7 +353,7 @@ class TestHarnessBuilderBuild:
         assert builder.event_bus.listener_count == 1
 
         call_kwargs = mock_create.call_args.kwargs
-        assert call_kwargs["skills"] is not None
+        assert call_kwargs["memory"] is not None
         assert call_kwargs["subagents"] is not None
         assert len(call_kwargs["subagents"]) == 1
 
@@ -441,3 +441,174 @@ class TestHarnessBuilderConfig:
 
         call_kwargs = mock_create.call_args.kwargs
         assert "Be helpful" in call_kwargs["system_prompt"]
+
+
+class TestHarnessBuilderLoadConfig:
+    """Tests for HarnessBuilder.load_config() — lightweight loading."""
+
+    def test_load_config_with_empty_harness(self, project_with_empty_harness: Path) -> None:
+        """load_config() works even with empty .harness/."""
+        builder = HarnessBuilder(project_with_empty_harness)
+        config = builder.load_config()
+        assert config is not None
+        assert config.model == "deepseek-v4-flash"  # default
+
+    def test_load_config_with_config_only(self, project_with_config_only: Path) -> None:
+        """load_config() parses config.yaml."""
+        builder = HarnessBuilder(project_with_config_only)
+        config = builder.load_config()
+        assert config.model == "deepseek-v4-flash"
+
+    def test_load_config_with_no_harness_dir(self, empty_project: Path) -> None:
+        """load_config() returns defaults when .harness/ doesn't exist."""
+        builder = HarnessBuilder(empty_project)
+        config = builder.load_config()
+        assert config is not None
+        assert config.model == "deepseek-v4-flash"
+
+    def test_load_config_registers_hooks(self, project_with_hooks: Path) -> None:
+        """load_config() loads hooks into the event bus."""
+        builder = HarnessBuilder(project_with_hooks)
+        builder.load_config()
+        assert builder.event_bus.listener_count == 1
+
+    def test_load_config_invalid_yaml_fails(self, tmp_path: Path) -> None:
+        """load_config() raises on invalid YAML."""
+        project = tmp_path / "bad-yaml"
+        project.mkdir()
+        harness_dir = project / ".harness"
+        harness_dir.mkdir()
+        (harness_dir / "config.yaml").write_text(
+            "model: deepseek-v4-flash\n\tbad: tab indent\n"
+        )
+        builder = HarnessBuilder(project)
+        with pytest.raises(Exception):
+            builder.load_config()
+
+
+class TestHarnessBuilderMemorySources:
+    """Tests for HarnessBuilder.get_memory_sources()."""
+
+    def test_get_memory_sources_empty(self, project_with_empty_harness: Path) -> None:
+        """No sources when .harness/ has no skills or rules."""
+        builder = HarnessBuilder(project_with_empty_harness)
+        builder.load_config()
+        sources = builder.get_memory_sources()
+        assert sources == []
+
+    def test_get_memory_sources_with_skills(self, project_with_skills: Path) -> None:
+        """Skill paths are collected as memory sources."""
+        builder = HarnessBuilder(project_with_skills)
+        builder.load_config()
+        sources = builder.get_memory_sources()
+        assert len(sources) == 1
+        assert "test-skill.md" in sources[0]
+
+    def test_get_memory_sources_with_rules(self, project_with_rules: Path) -> None:
+        """Rule paths are collected as memory sources."""
+        builder = HarnessBuilder(project_with_rules)
+        builder.load_config()
+        sources = builder.get_memory_sources()
+        assert len(sources) == 1
+        assert "test-rule.md" in sources[0]
+
+    def test_get_memory_sources_combined(self, full_harness_project: Path) -> None:
+        """Skills + rules are both collected."""
+        builder = HarnessBuilder(full_harness_project)
+        builder.load_config()
+        sources = builder.get_memory_sources()
+        assert len(sources) == 2  # 1 skill + 1 rule
+
+
+class TestHarnessBuilderSubagentDefs:
+    """Tests for HarnessBuilder.get_subagent_defs()."""
+
+    def test_get_subagent_defs_empty(self, project_with_empty_harness: Path) -> None:
+        """No subagents when none configured."""
+        builder = HarnessBuilder(project_with_empty_harness)
+        builder.load_config()
+        defs = builder.get_subagent_defs()
+        assert defs == []
+
+    def test_get_subagent_defs_with_subagents(
+        self, project_with_subagents: Path
+    ) -> None:
+        """Subagent defs are loaded from .harness/subagents/."""
+        builder = HarnessBuilder(project_with_subagents)
+        builder.load_config()
+        defs = builder.get_subagent_defs()
+        assert len(defs) == 1
+        assert defs[0]["name"] == "test-agent"
+
+
+class TestHarnessBuilderSystemPrompt:
+    """Tests for HarnessBuilder.get_system_prompt()."""
+
+    def test_get_system_prompt_default(self, project_with_empty_harness: Path) -> None:
+        """Returns default system prompt when no override."""
+        builder = HarnessBuilder(project_with_empty_harness)
+        builder.load_config()
+        prompt = builder.get_system_prompt()
+        assert "helpful AI assistant" in prompt.lower() or "core responsibilities" in prompt.lower()
+
+    def test_get_system_prompt_from_file(
+        self, tmp_path: Path
+    ) -> None:
+        """Returns custom prompt when system_prompt_file is set."""
+        project = tmp_path / "custom-prompt"
+        project.mkdir()
+        harness_dir = project / ".harness"
+        harness_dir.mkdir()
+        (project / "prompt.md").write_text("# Custom\nBe helpful.\n")
+        (harness_dir / "config.yaml").write_text(
+            "model: deepseek-v4-flash\nsystem_prompt_file: prompt.md\n"
+        )
+        builder = HarnessBuilder(project)
+        builder.load_config()
+        prompt = builder.get_system_prompt()
+        assert "Be helpful" in prompt
+
+
+class TestHarnessBuilderModelSelection:
+    """Tests for HarnessBuilder model resolution with model_selection."""
+
+    @mock.patch("harness_agent.loaders.harness_builder.create_deep_agent")
+    def test_build_uses_model_selection(
+        self,
+        mock_create: mock.MagicMock,
+        project_with_config_only: Path,
+    ) -> None:
+        """When model_selection is provided, it's used for model resolution."""
+        from harness_agent.config import AgentModelSelection
+
+        mock_create.return_value = mock.MagicMock()
+        model_sel = AgentModelSelection()
+        builder = HarnessBuilder(
+            project_with_config_only, model_selection=model_sel
+        )
+
+        # Mock model resolution and middleware to avoid API key requirement
+        builder._resolve_model = lambda name: mock.MagicMock()  # type: ignore[method-assign]
+        builder._build_middleware_pipeline = lambda **kw: []  # type: ignore[method-assign]
+
+        builder.build()
+
+        # Verify create_deep_agent was called with model_selection available
+        mock_create.assert_called_once()
+        assert builder.model_selection is model_sel
+
+
+class TestHarnessBuilderGracefulDegradation:
+    """Tests for graceful fallback when deepagents is not available."""
+
+    @mock.patch(
+        "harness_agent.loaders.harness_builder._DEEPAGENTS_AVAILABLE", False
+    )
+    def test_build_fails_without_deepagents(
+        self, project_with_config_only: Path
+    ) -> None:
+        """build() raises HarnessBuildError when deepagents is missing."""
+        builder = HarnessBuilder(project_with_config_only)
+        from harness_agent.loaders.harness_builder import HarnessBuildError
+        with pytest.raises(HarnessBuildError, match="deepagents"):
+            builder.build()

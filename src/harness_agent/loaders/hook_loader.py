@@ -204,6 +204,42 @@ class EventBus:
         self._listeners.clear()
 
 
+# ── Hook Info ────────────────────────────────────────────────────────────────
+
+
+class HookInfo:
+    """Basic information about a registered hook."""
+
+    def __init__(
+        self,
+        name: str,
+        event: str,
+        language: str,
+        size: int,
+    ) -> None:
+        self.name = name
+        self.event = event
+        self.language = language
+        self.size = size
+
+    def __repr__(self) -> str:
+        return (
+            f"HookInfo(name={self.name!r}, "
+            f"event={self.event!r}, "
+            f"language={self.language!r})"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, HookInfo):
+            return NotImplemented
+        return (
+            self.name == other.name
+            and self.event == other.event
+            and self.language == other.language
+            and self.size == other.size
+        )
+
+
 # ── Hook Loader ─────────────────────────────────────────────────────────────
 
 
@@ -233,12 +269,13 @@ class HookLoader:
         "on_error": HookEvent.ON_ERROR,
     }
 
-    def __init__(self, harness_dir: Path, event_bus: EventBus) -> None:
+    def __init__(self, harness_dir: Path, event_bus: EventBus | None = None) -> None:
         """Create a hook loader for the given ``.harness/`` directory.
 
         Args:
             harness_dir: Path to the ``.harness/`` directory.
-            event_bus: The EventBus to register hooks into.
+            event_bus: The EventBus to register hooks into (optional for
+                read-only operations like list_hooks).
         """
         self.hooks_dir = harness_dir / "hooks"
         self.event_bus = event_bus
@@ -248,6 +285,41 @@ class HookLoader:
         """Check whether the hooks/ directory exists."""
         return self.hooks_dir.is_dir()
 
+    def list_hooks(self) -> list[HookInfo]:
+        """List information about all available hooks (without loading them).
+
+        Returns:
+            List of HookInfo with name, event, language, and size.
+            Empty list if the hooks directory does not exist.
+        """
+        if not self.exists:
+            return []
+
+        result: list[HookInfo] = []
+        for file in sorted(self.hooks_dir.iterdir()):
+            if file.is_dir():
+                continue
+
+            event = self._file_to_event(file.stem)
+            event_name = event.value if event else "unknown"
+
+            if file.suffix == ".sh":
+                language = "shell"
+            elif file.suffix == ".py":
+                language = "python"
+            else:
+                language = file.suffix.lstrip(".")
+
+            result.append(
+                HookInfo(
+                    name=file.stem,
+                    event=event_name,
+                    language=language,
+                    size=file.stat().st_size,
+                )
+            )
+        return result
+
     def load_all(self) -> list[str]:
         """Scan .harness/hooks/ and register all hooks into the EventBus.
 
@@ -255,6 +327,12 @@ class HookLoader:
             List of hook file names that were successfully loaded.
         """
         if not self.exists:
+            return []
+
+        if self.event_bus is None:
+            logger.warning(
+                "No EventBus provided — hooks found but not registered"
+            )
             return []
 
         loaded: list[str] = []

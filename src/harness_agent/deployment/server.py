@@ -10,24 +10,34 @@ import logging
 import time as _time_module
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
-
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
-from langchain_core.runnables import RunnableConfig
 from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from harness_agent.config import AgentModelSelection
 from harness_agent.core.agent import HarnessAgent
+from harness_agent.loaders.config_loader import ConfigLoader
+from harness_agent.loaders.harness_builder import HarnessBuilder
+from harness_agent.loaders.hook_loader import (
+    EventBus,
+    HookEvent,
+    HookLoader,
+)
+from harness_agent.loaders.rule_loader import RuleLoader
+from harness_agent.loaders.skill_loader import SkillLoader
+from harness_agent.loaders.subagent_loader import SubAgentLoader
 from harness_agent.monitoring.dashboard import (
     HealthDashboardResponse,
     MetricsResponse,
     build_dashboard_response,
 )
 from harness_agent.monitoring.metrics import AgentMetrics
+from harness_agent.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +111,7 @@ class ServerConfig:
     enable_memory: bool = True
     model_selection: AgentModelSelection | None = None
     max_tool_iterations: int = 50
+    harness_dir: str = ""
 
     def __post_init__(self) -> None:
         if self.shell_allow_list is None:
@@ -114,7 +125,7 @@ class ServerConfig:
 # Agent pool (in-memory, single-tenant; multi-tenant uses TenantAgentManager)
 # ---------------------------------------------------------------------------
 
-_agent_pool: dict[str, HarnessAgent] = {}
+_agent_pool: dict[str, Any] = {}
 _agent_metrics: AgentMetrics = AgentMetrics()
 _tool_history: list[dict[str, Any]] = []
 _activity_log: list[dict[str, Any]] = []
@@ -244,30 +255,129 @@ def create_server_app(
     import time as _time_module_inner
     _server_start_time = _time_module_inner.monotonic()
     _memory_store: dict[str, Any] = {}
+    _server_event_bus = EventBus()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> Any:  # noqa: ARG001
-        """Startup and shutdown lifecycle."""
+        """Startup and shutdown lifecycle.
+
+        When ``harness_dir`` is set and contains a valid ``.harness/``
+        directory, uses ``HarnessBuilder`` to create the agent with full
+        MemoryMiddleware (progressive disclosure for skills/rules) and
+        SubAgentMiddleware (task tool for subagents).
+
+        Falls back to basic ``HarnessAgent`` when no harness is configured.
+        """
         from harness_agent.tools.basic_tools import BASIC_TOOLS
 
-        llm = model_sel.to_langchain_model(model_sel.orchestrator)
-        agent = HarnessAgent(
-            llm=llm,
-            tools=BASIC_TOOLS,
-            system_prompt=(
+        harness_dir = Path(cfg.harness_dir) if cfg.harness_dir else None
+        harness_available = (
+            harness_dir is not None and (harness_dir / ".harness").is_dir()
+        )
+
+        if harness_available and harness_dir is not None:
+            # ── Use HarnessBuilder for full middleware support ──
+            try:
+                tool_registry = ToolRegistry()
+                for t in BASIC_TOOLS:
+                    tool_registry.register(t)
+
+                builder = HarnessBuilder(
+                    harness_dir,
+                    tool_registry=tool_registry,
+                    model_selection=model_sel,
+                )
+                graph = builder.build()
+                _agent_pool[cfg.assistant_id] = graph
+                _server_event_bus_ref = builder.event_bus
+
+                # Load hooks for server lifecycle
+                HookLoader(
+                    harness_dir / ".harness", _server_event_bus
+                ).load_all()
+
+                logger.info(
+                    "Agent server '%s' (harness mode) ready on %s:%d",
+                    cfg.assistant_id,
+                    cfg.host,
+                    cfg.port,
+                )
+            except Exception as e:
+                logger.warning(
+                    "HarnessBuilder failed (%s), falling back to basic agent", e
+                )
+                harness_available = False
+
+        if not harness_available:
+            # ── Basic HarnessAgent (no .harness/ or builder failed) ──
+            llm = model_sel.to_langchain_model(model_sel.orchestrator)
+
+            # Resolve system prompt from harness config if available
+            system_prompt = (
                 "You are a production coding assistant for the "
                 "Harness Agent project."
-            ),
-            max_tool_iterations=cfg.max_tool_iterations,
+            )
+            if harness_dir is not None:
+                harness_path = harness_dir / ".harness"
+                if harness_path.is_dir():
+                    try:
+                        config_loader = ConfigLoader(harness_path)
+                        hconfig = config_loader.load()
+                        custom = config_loader.load_system_prompt(
+                            hconfig, harness_dir
+                        )
+                        if custom:
+                            system_prompt = custom
+                    except Exception:
+                        pass  # Use default system prompt
+
+            agent = HarnessAgent(
+                llm=llm,
+                tools=BASIC_TOOLS,
+                system_prompt=system_prompt,
+                max_tool_iterations=cfg.max_tool_iterations,
+            )
+            _agent_pool[cfg.assistant_id] = agent
+            _server_event_bus_ref = _server_event_bus
+
+            logger.info(
+                "Agent server '%s' (basic mode) ready on %s:%d",
+                cfg.assistant_id,
+                cfg.host,
+                cfg.port,
+            )
+
+        # Fire session_start hooks
+        _server_event_bus_ref.fire(
+            HookEvent.SESSION_START,
+            {
+                "session_id": cfg.assistant_id,
+                "project_root": str(harness_dir) if harness_dir else "",
+                "config": {
+                    "model": getattr(model_sel.orchestrator, "model_id", "?"),
+                },
+                "timestamp": _time_module.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", _time_module.gmtime()
+                ),
+            },
         )
-        _agent_pool[cfg.assistant_id] = agent
-        logger.info(
-            "Agent server '%s' ready on %s:%d",
-            cfg.assistant_id,
-            cfg.host,
-            cfg.port,
-        )
+
         yield
+
+        # Fire session_end hooks
+        _server_event_bus_ref.fire(
+            HookEvent.SESSION_END,
+            {
+                "session_id": cfg.assistant_id,
+                "total_tokens": int(_agent_metrics.total_tokens),
+                "tool_calls_count": _agent_metrics.tool_calls,
+                "duration_ms": int(
+                    (_time_module.monotonic() - _server_start_time) * 1000
+                ),
+                "success": True,
+            },
+        )
+
         _agent_pool.pop(cfg.assistant_id, None)
         logger.info("Agent server '%s' shut down", cfg.assistant_id)
 
@@ -509,6 +619,86 @@ def create_server_app(
         if not html_path.exists():
             raise HTTPException(status_code=404, detail="Activity UI not found")
         return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+
+    # ── Harness Info Endpoints ──────────────────────────────────────────
+
+    # Initialize loaders from harness_dir if provided
+    _harness_path = (
+        Path(cfg.harness_dir) if cfg.harness_dir else Path(".harness")
+    )
+    _skill_loader = SkillLoader(_harness_path)
+    _rule_loader = RuleLoader(_harness_path)
+    _tool_registry = ToolRegistry()
+    _subagent_loader = SubAgentLoader(_harness_path, _tool_registry)
+    _hook_loader = HookLoader(_harness_path)
+
+    @app.get("/harness")
+    async def get_harness_registry() -> dict[str, Any]:
+        """Return a combined registry of all harness components.
+
+        Includes skills, rules, hooks, and subagents found in the
+        .harness/ directory.
+        """
+        return {
+            "skills": [
+                {"name": s.name, "size": s.size}
+                for s in _skill_loader.list_skills()
+            ],
+            "rules": [
+                {"name": r.name, "path": r.relative_path, "size": r.size}
+                for r in _rule_loader.list_rules()
+            ],
+            "hooks": [
+                {"name": h.name, "event": h.event, "language": h.language}
+                for h in _hook_loader.list_hooks()
+            ],
+            "subagents": [
+                {
+                    "name": s.name,
+                    "description": s.description,
+                    "source_file": s.source_file,
+                    "tool_count": s.tool_count,
+                }
+                for s in _subagent_loader.list_subagents()
+            ],
+        }
+
+    @app.get("/skills")
+    async def get_skills() -> list[dict[str, Any]]:
+        """List all skills from .harness/skills/."""
+        return [
+            {"name": s.name, "size": s.size}
+            for s in _skill_loader.list_skills()
+        ]
+
+    @app.get("/rules")
+    async def get_rules() -> list[dict[str, Any]]:
+        """List all rules from .harness/rules/."""
+        return [
+            {"name": r.name, "path": r.relative_path, "size": r.size}
+            for r in _rule_loader.list_rules()
+        ]
+
+    @app.get("/hooks")
+    async def get_hooks() -> list[dict[str, Any]]:
+        """List all hooks from .harness/hooks/."""
+        return [
+            {"name": h.name, "event": h.event, "language": h.language}
+            for h in _hook_loader.list_hooks()
+        ]
+
+    @app.get("/subagents")
+    async def get_subagents() -> list[dict[str, Any]]:
+        """List all subagents from .harness/subagents/."""
+        return [
+            {
+                "name": s.name,
+                "description": s.description,
+                "source_file": s.source_file,
+                "tool_count": s.tool_count,
+            }
+            for s in _subagent_loader.list_subagents()
+        ]
 
     return app
 

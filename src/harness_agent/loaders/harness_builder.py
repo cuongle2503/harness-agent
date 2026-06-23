@@ -9,28 +9,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from deepagents import create_deep_agent
-from deepagents.backends import (
-    CompositeBackend,
-    FilesystemBackend,
-    StateBackend,
-    StoreBackend,
-)
-from deepagents.middleware.filesystem import FilesystemMiddleware
-from deepagents.middleware.memory import MemoryMiddleware
-from deepagents.middleware.subagents import SubAgentMiddleware
-from deepagents.middleware.summarization import SummarizationMiddleware
-from langchain.agents.middleware import (
-    ContextEditingMiddleware,
-    HumanInTheLoopMiddleware,
-    ModelFallbackMiddleware,
-    PIIMiddleware,
-    ShellToolMiddleware,
-    TodoListMiddleware,
-    ToolRetryMiddleware,
-)
 from langchain_core.language_models import BaseChatModel
-from langgraph.graph.state import CompiledStateGraph
 
 from harness_agent.config import AgentModelSelection
 from harness_agent.loaders.config_loader import ConfigLoader, HarnessConfig
@@ -41,6 +20,31 @@ from harness_agent.loaders.subagent_loader import SubAgentLoader
 from harness_agent.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+# Optional deepagents imports — only needed when create_deep_agent is used
+try:
+    from deepagents import create_deep_agent  # noqa: F811
+    from deepagents.backends import (  # noqa: F811
+        CompositeBackend,
+        FilesystemBackend,
+        StateBackend,
+        StoreBackend,
+    )
+    _DEEPAGENTS_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _DEEPAGENTS_AVAILABLE = False
+
+try:
+    from langchain.agents.middleware import (  # noqa: F811
+        ContextEditingMiddleware,
+        ModelFallbackMiddleware,
+        PIIMiddleware,
+        ShellToolMiddleware,
+        ToolRetryMiddleware,
+    )
+    _LANGCHAIN_MIDDLEWARE_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _LANGCHAIN_MIDDLEWARE_AVAILABLE = False
 
 # Default middleware order (5-layer principle from 03-middleware.md)
 DEFAULT_MIDDLEWARE_ORDER = [
@@ -91,6 +95,9 @@ class HarnessBuilder:
                 or may contain a ``.harness/`` subdirectory).
             tool_registry: Optional pre-configured ToolRegistry.
             model_selection: Optional pre-configured AgentModelSelection.
+                When provided, used by ``_resolve_model`` to create models
+                via the configured provider/factory instead of always
+                defaulting to ``ChatDeepSeek``.
         """
         self.project_root = project_root.resolve()
         self.harness_dir = self.project_root / ".harness"
@@ -109,19 +116,79 @@ class HarnessBuilder:
 
         # Results (set after build())
         self.config: HarnessConfig | None = None
-        self.agent: CompiledStateGraph | None = None
+        self.agent: Any = None  # CompiledStateGraph | None
 
     # ── Public API ──────────────────────────────────────────────────────
 
-    def build(self) -> CompiledStateGraph:
-        """Build the agent from ``.harness/`` configuration.
+    def load_config(self) -> HarnessConfig:
+        """Load and validate harness configuration without building the agent.
+
+        This is a lightweight alternative to ``build()`` — it loads config,
+        hooks, and collects memory sources, but does NOT require
+        ``create_deep_agent`` from the ``deepagents`` package.
 
         Returns:
-            A CompiledStateGraph ready for invoke/stream.
+            The validated HarnessConfig.
 
         Raises:
             HarnessBuildError: If the config is invalid.
         """
+        logger.info("Loading harness config from: %s", self.harness_dir)
+
+        # Step 1: Load & validate config
+        self.config = self._load_and_validate_config()
+
+        # Step 2: Load hooks (so they're registered before agent starts)
+        self.hook_loader.load_all()
+
+        return self.config
+
+    def get_memory_sources(self) -> list[str]:
+        """Return memory source paths from skills + rules.
+
+        These paths can be passed to ``create_deep_agent(memory=...)``
+        for MemoryMiddleware-driven progressive disclosure.
+
+        Returns:
+            List of file paths to skill and rule markdown files.
+        """
+        return self._collect_memory_sources()
+
+    def get_subagent_defs(self) -> list[dict[str, Any]]:
+        """Return subagent definitions from ``.harness/subagents/``.
+
+        Returns:
+            List of subagent definition dicts ready for
+            ``create_deep_agent(subagents=...)``.
+        """
+        return self.subagent_loader.load_all()
+
+    def get_system_prompt(self) -> str:
+        """Build and return the system prompt from harness config.
+
+        Returns:
+            System prompt string resolved from config overrides
+            or the built-in default.
+        """
+        return self._build_system_prompt()
+
+    def build(self) -> Any:
+        """Build the agent from ``.harness/`` configuration.
+
+        Returns:
+            A CompiledStateGraph ready for invoke/stream when
+            ``deepagents`` is available, otherwise raises HarnessBuildError.
+
+        Raises:
+            HarnessBuildError: If ``deepagents`` is not installed or the
+                config is invalid.
+        """
+        if not _DEEPAGENTS_AVAILABLE:
+            raise HarnessBuildError(
+                "deepagents package is required for HarnessBuilder.build(). "
+                "Install it with: pip install deepagents"
+            )
+
         logger.info("Building harness from: %s", self.harness_dir)
 
         # Step 1: Load & validate config
@@ -138,7 +205,6 @@ class HarnessBuilder:
 
         # Step 5: Collect memory sources from skills + rules
         memory_sources = self._collect_memory_sources()
-        skill_sources = self.skill_loader.get_memory_sources()
 
         # Step 6: Resolve models
         main_model = self._resolve_model(self.config.model)
@@ -146,7 +212,9 @@ class HarnessBuilder:
             self.config.summarization_model
         )
 
-        # Step 7: Build middleware pipeline
+        # Step 7: Build middleware pipeline (excludes MemoryMiddleware and
+        # SubAgentMiddleware — those are auto-created by create_deep_agent
+        # from the `memory=` and `subagents=` parameters below).
         middleware = self._build_middleware_pipeline(
             backend=backend,
             subagent_defs=subagent_defs,
@@ -158,13 +226,17 @@ class HarnessBuilder:
         system_prompt = self._build_system_prompt()
 
         # Step 9: Create agent
+        # NOTE: Do NOT pass MemoryMiddleware or SubAgentMiddleware in the
+        # `middleware` list — create_deep_agent auto-creates them from the
+        # `memory=` and `subagents=` parameters. Passing both causes
+        # "Please remove duplicate middleware instances."
         self.agent = create_deep_agent(
             model=main_model,
             middleware=middleware,
             backend=backend,
             system_prompt=system_prompt,
             subagents=subagent_defs if subagent_defs else None,
-            skills=skill_sources if skill_sources else None,
+            memory=memory_sources if memory_sources else None,
         )
 
         logger.info("Harness built successfully")
@@ -178,7 +250,7 @@ class HarnessBuilder:
         errors = config.validate()
         if errors:
             raise HarnessBuildError(
-                f"Invalid .harness/config.yaml:\n"
+                "Invalid .harness/config.yaml:\n"
                 + "\n".join(f"  - {e}" for e in errors)
             )
         return config
@@ -215,17 +287,41 @@ class HarnessBuilder:
         return sources
 
     def _resolve_model(self, model_name: str) -> BaseChatModel:
-        """Resolve a model name to a BaseChatModel instance."""
+        """Resolve a model name to a BaseChatModel instance.
+
+        Uses ``self.model_selection.to_langchain_model()`` when a
+        model_selection was provided, falling back to a direct
+        ``ChatDeepSeek`` constructor for backward compatibility.
+        """
+        if self.model_selection is not None:
+            from harness_agent.config import ModelConfig
+
+            model_config = ModelConfig(
+                model_id=model_name,
+                provider="deepseek",
+                temperature=0.0,
+                purpose="HarnessBuilder resolved model",
+            )
+            try:
+                return self.model_selection.to_langchain_model(model_config)
+            except Exception:
+                logger.warning(
+                    "model_selection.to_langchain_model() failed for %s, "
+                    "falling back to ChatDeepSeek",
+                    model_name,
+                )
+
+        # Fallback for when no model_selection or when it fails
         from langchain_deepseek import ChatDeepSeek
 
         return ChatDeepSeek(model=model_name, temperature=0.0)  # type: ignore[call-arg]
 
     def _build_middleware_pipeline(
         self,
-        backend: CompositeBackend,
-        subagent_defs: list[dict[str, Any]],
-        memory_sources: list[str],
-        summarization_model: BaseChatModel,
+        backend: CompositeBackend,  # noqa: ARG002
+        subagent_defs: list[dict[str, Any]],  # noqa: ARG002
+        memory_sources: list[str],  # noqa: ARG002
+        summarization_model: BaseChatModel,  # noqa: ARG002
     ) -> list[Any]:
         """Build the middleware pipeline from config or defaults.
 
@@ -235,41 +331,50 @@ class HarnessBuilder:
         assert self.config is not None
         order = self.config.middleware_order or DEFAULT_MIDDLEWARE_ORDER
 
-        # Middleware name → factory function
+        # Middleware name → factory function.
+        #
+        # IMPORTANT: create_deep_agent auto-creates these middleware:
+        #   TodoListMiddleware, FilesystemMiddleware, SummarizationMiddleware,
+        #   PatchToolCallsMiddleware, AnthropicPromptCachingMiddleware,
+        #   SkillsMiddleware (from `skills=` param),
+        #   SubAgentMiddleware (from `subagents=` param),
+        #   MemoryMiddleware (from `memory=` param),
+        #   HumanInTheLoopMiddleware (from `interrupt_on=` param).
+        #
+        # Only middleware NOT auto-created should be included here.
+        # Duplicate middleware names cause "Please remove duplicate middleware
+        # instances." from create_agent.
         factories: dict[str, Any] = {
-            "TodoListMiddleware": lambda: TodoListMiddleware(),
-            "MemoryMiddleware": lambda: MemoryMiddleware(
-                backend=backend,
-                sources=memory_sources,
+            # ── Auto-created by create_deep_agent → skip ──
+            "TodoListMiddleware": lambda: None,
+            "MemoryMiddleware": lambda: None,
+            "HumanInTheLoopMiddleware": lambda: None,
+            "FilesystemMiddleware": lambda: None,
+            "SubAgentMiddleware": lambda: None,
+            "SummarizationMiddleware": lambda: None,
+            # ── User-added middleware (NOT auto-created) ──
+            "PIIMiddleware": (
+                lambda: PIIMiddleware(pii_type="email")
+                if _LANGCHAIN_MIDDLEWARE_AVAILABLE else None
             ),
-            "HumanInTheLoopMiddleware": lambda: HumanInTheLoopMiddleware(
-                interrupt_on={},
+            "ShellToolMiddleware": (
+                lambda: ShellToolMiddleware()
+                if _LANGCHAIN_MIDDLEWARE_AVAILABLE else None
             ),
-            "PIIMiddleware": lambda: PIIMiddleware(pii_type="email"),
-            "FilesystemMiddleware": lambda: FilesystemMiddleware(
-                backend=backend
+            "ContextEditingMiddleware": (
+                lambda: ContextEditingMiddleware()
+                if _LANGCHAIN_MIDDLEWARE_AVAILABLE else None
             ),
-            "SubAgentMiddleware": lambda: (
-                SubAgentMiddleware(
-                    backend=backend,
-                    subagents=subagent_defs,
+            "ModelFallbackMiddleware": (
+                lambda: ModelFallbackMiddleware(
+                    "deepseek-v4-pro", "deepseek-v4-flash"
                 )
-                if subagent_defs
-                else None
+                if _LANGCHAIN_MIDDLEWARE_AVAILABLE else None
             ),
-            "ShellToolMiddleware": lambda: ShellToolMiddleware(),
-            "SummarizationMiddleware": lambda: SummarizationMiddleware(
-                model=summarization_model,
-                backend=backend,
-                trigger=("tokens", 120_000),
-                keep=("messages", 20),
+            "ToolRetryMiddleware": (
+                lambda: ToolRetryMiddleware()
+                if _LANGCHAIN_MIDDLEWARE_AVAILABLE else None
             ),
-            "ContextEditingMiddleware": lambda: ContextEditingMiddleware(),
-            "ModelFallbackMiddleware": lambda: ModelFallbackMiddleware(
-                "deepseek-v4-pro",
-                "deepseek-v4-flash",
-            ),
-            "ToolRetryMiddleware": lambda: ToolRetryMiddleware(),
             # Placeholders for middleware not yet fully implemented
             "ToolCallLimitMiddleware": lambda: None,
             "ModelCallLimitMiddleware": lambda: None,

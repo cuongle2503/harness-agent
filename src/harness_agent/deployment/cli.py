@@ -15,6 +15,7 @@ import sys
 import time
 import unicodedata
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -34,10 +35,18 @@ from harness_agent.deployment.cli_metrics_server import (
     record_session,
     record_tool_history,
 )
+from harness_agent.loaders.config_loader import ConfigLoader, HarnessConfig
+from harness_agent.loaders.harness_builder import HarnessBuilder
+from harness_agent.loaders.hook_loader import (
+    EventBus,
+    HookEvent,
+    HookResult,
+)
 from harness_agent.memory.hybrid_memory import HybridMemory
 from harness_agent.monitoring.metrics import AgentMetrics
 from harness_agent.prompts import load_prompt
 from harness_agent.security.sandbox import SandboxConfig
+from harness_agent.tools.registry import ToolRegistry
 
 # ---------------------------------------------------------------------------
 # Metrics bridge — host mode (direct) vs client mode (HTTP POST)
@@ -99,8 +108,8 @@ class _MetricsBridge:
         except Exception:
             if self._push_ok:
                 self._push_ok = False
-                print(f"\n  ⚠ Metrics push failed (proxy may block localhost "
-                      f"connections)")
+                print("\n  ⚠ Metrics push failed (proxy may block localhost "
+                      "connections)")
 
 # ---------------------------------------------------------------------------
 # Terminal colors (ANSI)
@@ -678,6 +687,7 @@ class CLIAgentConfig:
     monitoring_port: int = 2025
     sandbox_type: str = "docker"
     cwd: str = field(default_factory=os.getcwd)
+    project_root: str = field(default_factory=os.getcwd)
     mcp_servers: dict[str, dict[str, Any]] = field(default_factory=dict)
     model_selection: AgentModelSelection = field(
         default_factory=AgentModelSelection
@@ -696,9 +706,21 @@ class CLIAgent:
 
     def __init__(self, config: CLIAgentConfig | None = None) -> None:
         self.config = config or CLIAgentConfig()
+
+        # ── Harness state (populated by _load_harness_if_present) ──
+        self._harness_config: HarnessConfig | None = None
+        self._harness_skill_sources: list[str] = []
+        self._harness_rule_sources: list[str] = []
+        self._harness_subagent_defs: list[dict[str, Any]] = []
+        self._harness_builder: Any = None  # HarnessBuilder | None
+        self._event_bus = EventBus()
+        self._load_harness_if_present()
+
+        # ── Initialize components (may use harness overrides) ──
         self._llm = self._init_llm()
         self._sandbox = self._init_sandbox()
         self._agent = self._init_agent()
+        self._graph: Any = None  # CompiledStateGraph from HarnessBuilder
         self._memory = HybridMemory()
         self._metrics = AgentMetrics()
         self._start_time = time.monotonic()
@@ -706,16 +728,6 @@ class CLIAgent:
         self._bridge: _MetricsBridge | None = None
         self._metrics_server = self._connect_metrics_aggregator()
         self._init_debug_mode()
-
-    def _init_llm(self) -> BaseChatModel:
-        """Initialize the language model from config."""
-        from typing import cast
-
-        model_config = self.config.model_selection.orchestrator
-        return cast(
-            BaseChatModel,
-            self.config.model_selection.to_langchain_model(model_config),
-        )
 
     def _init_sandbox(self) -> SandboxConfig | None:
         """Initialize the sandbox if configured."""
@@ -736,9 +748,158 @@ class CLIAgent:
         from harness_agent.monitoring.debug import configure_debug_mode
         configure_debug_mode()
 
+    # ── Harness loading ─────────────────────────────────────────────────
+
+    def _load_harness_if_present(self) -> None:
+        """Detect and load ``.harness/`` configuration.
+
+        Uses ``HarnessBuilder`` for proper progressive disclosure
+        (MemoryMiddleware) and subagent management (SubAgentMiddleware).
+
+        If ``.harness/`` does not exist at ``project_root``, this is a
+        no-op — the agent works as before with built-in defaults.
+        """
+        project_root = Path(self.config.project_root)
+        harness_dir = project_root / ".harness"
+        if not harness_dir.is_dir():
+            return
+
+        from harness_agent.tools.basic_tools import BASIC_TOOLS
+
+        # Build tool registry for subagent validation
+        tool_registry = ToolRegistry()
+        for t in BASIC_TOOLS:
+            tool_registry.register(t)
+
+        # Use HarnessBuilder as single entry point for all harness loading
+        builder = HarnessBuilder(
+            project_root,
+            tool_registry=tool_registry,
+            model_selection=self.config.model_selection,
+        )
+        self._harness_builder = builder
+
+        # 1. Load & validate config.yaml
+        try:
+            self._harness_config = builder.load_config()
+        except Exception as e:
+            print(f"\n  {Color.warn(f'⚠ .harness/config.yaml error: {e}')}")
+            return
+
+        harness_cfg = self._harness_config
+        if harness_cfg is None:
+            return
+        errors = harness_cfg.validate()
+        if errors:
+            print(f"\n  {Color.warn('⚠ .harness/config.yaml has issues:')}")
+            for e in errors:
+                print(f"    {Color.dim(f'- {e}')}")
+
+        # 2. Collect skill/rule memory sources (file paths, NOT content)
+        # MemoryMiddleware in create_deep_agent handles progressive
+        # disclosure — skills are name+description only until invoked.
+        self._harness_skill_sources = builder.skill_loader.get_memory_sources()
+        self._harness_rule_sources = builder.rule_loader.get_memory_sources()
+
+        # 3. Load hooks into event bus (already done by load_config)
+        #    HookLoader was called inside builder.load_config()
+
+        # 4. Load subagent definitions
+        try:
+            self._harness_subagent_defs = builder.get_subagent_defs()
+        except Exception as e:
+            print(
+                f"  {Color.warn(f'⚠ Subagent loading failed: {e}')}"
+            )
+
+    # ── LLM / Agent initialization ──────────────────────────────────────
+
+    def _init_llm(self) -> BaseChatModel:
+        """Initialize the language model from config.
+
+        If ``.harness/config.yaml`` specifies a model, it overrides the
+        default orchestrator model from ``AgentModelSelection``.
+        """
+        from typing import cast
+
+        model_config = self.config.model_selection.orchestrator
+
+        # .harness/config.yaml model override
+        if self._harness_config and self._harness_config.model:
+            from harness_agent.config import ModelConfig
+            model_config = ModelConfig(
+                model_id=self._harness_config.model,
+                provider="deepseek",
+                temperature=0.0,
+                purpose="Orchestrator (from .harness/config.yaml)",
+            )
+
+        return cast(
+            BaseChatModel,
+            self.config.model_selection.to_langchain_model(model_config),
+        )
+
     def _init_agent(self) -> HarnessAgent:
-        """Initialize the LangChain agent with tools and system prompt."""
-        system_prompt = self.config.system_prompt or load_prompt("main_agent")
+        """Initialize the LangChain agent with tools and system prompt.
+
+        When ``.harness/`` is present and ``deepagents`` is available,
+        attempts to use ``HarnessBuilder.build()`` to create a full
+        ``CompiledStateGraph`` with MemoryMiddleware (progressive
+        disclosure for skills/rules) and SubAgentMiddleware (task tool).
+
+        Falls back to ``HarnessAgent`` when ``deepagents`` is not
+        installed or ``.harness/`` is absent.
+
+        System prompt priority:
+        1. ``CLIAgentConfig.system_prompt`` (CLI flag)
+        2. ``.harness/config.yaml`` inline ``system_prompt`` or
+           ``system_prompt_file``
+        3. ``HarnessBuilder.get_system_prompt()`` (when .harness/ present)
+        4. Built-in ``load_prompt("main_agent")``
+        """
+        # ── Try HarnessBuilder.build() for full middleware support ──
+        if self._harness_builder is not None:
+            try:
+                self._graph = self._harness_builder.build()
+                # Return a lightweight HarnessAgent wrapper for backward
+                # compatibility — _stream_turn detects self._graph and
+                # uses astream_events() instead of manual LLM loop.
+                from harness_agent.tools.basic_tools import BASIC_TOOLS
+                return HarnessAgent(
+                    llm=self._llm,
+                    tools=BASIC_TOOLS,
+                    system_prompt=self._harness_builder.get_system_prompt(),
+                    max_tool_iterations=self.config.max_tool_iterations,
+                )
+            except Exception as e:
+                print(
+                    f"\n  {Color.warn(f'⚠ HarnessBuilder.build() failed: {e}')}"
+                )
+                fallback_msg = (
+                    "Falling back to HarnessAgent "
+                    "(no MemoryMiddleware/SubAgentMiddleware)."
+                )
+                print(f"  {Color.dim(fallback_msg)}")
+                self._graph = None  # Ensure graph is None for fallback
+
+        # ── Resolve base system prompt ──
+        system_prompt = self.config.system_prompt
+
+        if not system_prompt and self._harness_builder is not None:
+            system_prompt = self._harness_builder.get_system_prompt()
+
+        if not system_prompt and self._harness_config:
+            project_root = Path(self.config.project_root)
+            loader = ConfigLoader(project_root / ".harness")
+            system_prompt = loader.load_system_prompt(
+                self._harness_config, project_root
+            )
+
+        if not system_prompt:
+            if self._harness_config is not None:
+                system_prompt = self._build_harness_system_prompt()
+            else:
+                system_prompt = load_prompt("main_agent")
 
         from harness_agent.tools.basic_tools import BASIC_TOOLS
 
@@ -748,6 +909,95 @@ class CLIAgent:
             system_prompt=system_prompt,
             max_tool_iterations=self.config.max_tool_iterations,
         )
+
+    def _build_harness_system_prompt(self) -> str:
+        """Build a complete system prompt from .harness/ configuration.
+
+        Only describes capabilities that actually exist — no hardcoded
+        subagents or tools that aren't configured.
+        """
+        parts: list[str] = [
+            "You are a Harness Agent — an AI-powered software engineering "
+            "assistant.",
+            "",
+            "## Core Responsibilities",
+            "- Analyze user requests and plan multi-step tasks",
+            "- Execute shell commands, read/write files, and search code",
+            "- Synthesize results into clear, actionable responses",
+            "- Learn from user feedback and save preferences",
+            "",
+            "## Available Tools",
+            "- **read_file**, **write_file**, **edit_file** — File operations",
+            "- **glob**, **grep** — Search files by pattern or content",
+            "- **execute_command** — Run shell commands (tests, lint, git, etc.)",
+        ]
+
+        # Subagents section — only list what's actually configured
+        if self._harness_subagent_defs:
+            parts.append("")
+            parts.append("## Available Subagents")
+            parts.append(
+                "These subagents are **pre-configured** in "
+                "``.harness/subagents/``. You can delegate tasks "
+                "to them when appropriate. "
+                "You do NOT have permission to create, modify, or "
+                "delete ``.harness/subagents/*.yaml`` files."
+            )
+            parts.append("")
+            for sub in self._harness_subagent_defs:
+                name = sub["name"]
+                desc = sub.get("description", "No description")
+                model = sub.get("model", "?")
+                tools = [t.name for t in sub.get("tools", [])]
+                parts.append(
+                    f"- **{name}** ({model}): {desc}\n"
+                    f"  Tools: {', '.join(tools) if tools else 'none'}"
+                )
+        else:
+            parts.append(
+                ""
+                "**No subagents are configured.** "
+                "Handle all tasks directly with your available tools. "
+                "Do NOT create ``.harness/subagents/*.yaml`` files "
+                "yourself; subagents must be pre-configured by the user."
+            )
+
+        parts.extend([
+            "",
+            "## Workflow",
+            "1. **Analyze** the user's request",
+            "2. **Plan** multi-step tasks",
+            "3. **Execute** using available tools",
+            "4. **Synthesize** results into a clear response",
+            "5. **Learn** — save user preferences to memory",
+            "",
+            "## Quality Standards",
+            "- Always plan before executing complex tasks",
+            "- Follow project conventions (PEP 8, type hints, conventional commits)",
+            "- Provide specific, actionable responses with code examples",
+            "- Ask clarifying questions when requirements are unclear",
+            "",
+            "## Constraints",
+            "- Never expose API keys, passwords, or secrets",
+            "- Never hardcode secrets in source code",
+            "- Never execute dangerous shell commands without user approval",
+            "- Do not describe capabilities you don't actually have",
+        ])
+
+        return "\n".join(parts)
+
+    # ── Hook helpers ────────────────────────────────────────────────────
+
+    def _fire_hook(
+        self, event: HookEvent, context: dict[str, Any]
+    ) -> HookResult:
+        """Fire a hook event and return the aggregated result.
+
+        If no hooks are registered for this event (typical when
+        ``.harness/`` is absent), returns a default ``allowed=True``
+        result with near-zero overhead.
+        """
+        return self._event_bus.fire(event, context)
 
     def _connect_metrics_aggregator(self) -> Any:
         """Connect to the metrics aggregator (host or client mode).
@@ -892,8 +1142,215 @@ class CLIAgent:
     ) -> tuple[str | None, list]:
         """Stream a single agent turn with Claude-style tool display.
 
+        Delegates to ``_stream_turn_graph`` when ``self._graph``
+        (CompiledStateGraph from HarnessBuilder) is available — this
+        provides proper MemoryMiddleware (progressive disclosure for
+        skills/rules) and SubAgentMiddleware (task tool for subagents).
+
+        Falls back to manual LLM-loop streaming when using the basic
+        ``HarnessAgent``.
+
         Returns (final_text_response, updated_messages).
         """
+        # Delegate to graph-based streaming when HarnessBuilder built the agent
+        if self._graph is not None:
+            return await self._stream_turn_graph(messages, config)
+
+        return await self._stream_turn_agent(messages, config)
+
+    async def _stream_turn_graph(
+        self, messages: list, config: RunnableConfig
+    ) -> tuple[str | None, list]:
+        """Stream a turn using CompiledStateGraph.astream_events().
+
+        This path is used when ``HarnessBuilder.build()`` succeeded —
+        the agent has full MemoryMiddleware (progressive disclosure for
+        skills/rules) and SubAgentMiddleware (task tool for subagents).
+
+        Uses LangGraph's event-based streaming to get token-level text
+        AND tool-call visibility, then renders them with the same
+        Claude-style tool display boxes as the manual loop.
+        """
+        thread_id = config.get("configurable", {}).get("thread_id", "default")
+
+        # Fire pre_llm_call hooks
+        self._fire_hook(
+            HookEvent.PRE_LLM_CALL,
+            {
+                "session_id": thread_id,
+                "model": getattr(self._llm, "model_name", "?"),
+                "messages_count": len(messages),
+                "timestamp": time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                ),
+            },
+        )
+
+        stream_start = time.perf_counter()
+        final_text = ""
+        tool_count = 0
+        last_messages: list = list(messages)
+
+        try:
+            # Build input for CompiledStateGraph
+            graph_input: dict[str, Any] = {"messages": messages}
+
+            async for event in self._graph.astream_events(
+                graph_input, config, version="v2"
+            ):
+                kind = event.get("event", "")
+
+                if kind == "on_chat_model_stream":
+                    # Stream text tokens
+                    chunk = event.get("data", {}).get("chunk")
+                    if chunk is not None:
+                        content = _extract_chunk_text(chunk)
+                        if content:
+                            sys.stdout.write(content)
+                            sys.stdout.flush()
+                            final_text += content
+
+                elif kind == "on_tool_start":
+                    tool_count += 1
+                    tool_name = event.get("name", "unknown")
+                    tool_input = event.get("data", {}).get("input", {})
+
+                    # Fire pre_tool_call hooks
+                    pre_result = self._fire_hook(
+                        HookEvent.PRE_TOOL_CALL,
+                        {
+                            "session_id": thread_id,
+                            "tool_name": tool_name,
+                            "tool_args": tool_input,
+                            "timestamp": time.strftime(
+                                "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                            ),
+                        },
+                    )
+                    if not pre_result.allowed:
+                        blocked_msg = (
+                            f"Tool '{tool_name}' blocked by hook: "
+                            + "; ".join(pre_result.messages)
+                        )
+                        print(f"\n  {Color.warn('🚫 ' + blocked_msg)}")
+                        continue
+
+                    # Draw tool box top
+                    print()  # fresh line before tool box
+                    box_w = _draw_tool_box_top(tool_name, tool_input)
+
+                    # Store for on_tool_end
+                    self._graph_tool_state = {
+                        "name": tool_name,
+                        "input": tool_input,
+                        "box_w": box_w,
+                        "start": time.perf_counter(),
+                    }
+
+                elif kind == "on_tool_end":
+                    tool_state = getattr(self, "_graph_tool_state", None)
+                    if tool_state is not None:
+                        tool_name = tool_state["name"]
+                        tool_input = tool_state["input"]
+                        box_w = tool_state["box_w"]
+                        t0 = tool_state["start"]
+                        elapsed_ms = (time.perf_counter() - t0) * 1000
+
+                        output = event.get("data", {}).get("output")
+                        result_str = str(output) if output else "(no output)"
+                        error = "error" in str(kind).lower()
+
+                        # Fire post_tool_call hooks
+                        self._fire_hook(
+                            HookEvent.POST_TOOL_CALL,
+                            {
+                                "session_id": thread_id,
+                                "tool_name": tool_name,
+                                "tool_args": tool_input,
+                                "tool_result": result_str,
+                                "duration_ms": int(elapsed_ms),
+                                "success": not error,
+                            },
+                        )
+
+                        # Record tool metrics
+                        self._metrics.record_tool_call(
+                            tool_name, elapsed_ms, success=not error
+                        )
+
+                        # Draw tool box bottom
+                        _draw_tool_box_bottom(
+                            box_w,
+                            result=result_str,
+                            elapsed_ms=elapsed_ms,
+                            error=error,
+                        )
+
+                        # Record to activity feed
+                        if self._bridge:
+                            self._bridge.tool_history(
+                                name=tool_name,
+                                input_str=json.dumps(tool_input)
+                                if isinstance(tool_input, dict)
+                                else str(tool_input),
+                                output_str=result_str[:500],
+                                latency_ms=elapsed_ms,
+                                success=not error,
+                            )
+                            self._bridge.activity(
+                                "tool_end",
+                                name=tool_name,
+                                latency_ms=round(elapsed_ms, 2),
+                            )
+
+                        self._graph_tool_state = None
+
+                elif kind == "on_chain_end":
+                    # Capture final messages from the chain output
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict):
+                        last_messages = output.get("messages", last_messages)
+
+        except Exception as e:
+            # Fire ON_ERROR hook
+            import traceback as _traceback
+            self._fire_hook(
+                HookEvent.ON_ERROR,
+                {
+                    "session_id": thread_id,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "traceback": _traceback.format_exc(),
+                    "context": {
+                        "messages_count": len(messages),
+                        "tool_count": tool_count,
+                    },
+                },
+            )
+            raise
+
+        # Fire post_llm_call hooks
+        stream_elapsed_ms = int((time.perf_counter() - stream_start) * 1000)
+        self._fire_hook(
+            HookEvent.POST_LLM_CALL,
+            {
+                "session_id": thread_id,
+                "model": getattr(self._llm, "model_name", "?"),
+                "tokens_used": 0,  # Graph doesn't expose token counts directly
+                "duration_ms": stream_elapsed_ms,
+                "success": True,
+            },
+        )
+
+        if final_text:
+            print()  # trailing newline after streamed text
+
+        return (final_text if final_text else None, last_messages)
+
+    async def _stream_turn_agent(
+        self, messages: list, config: RunnableConfig
+    ) -> tuple[str | None, list]:
+        """Manual LLM-loop streaming for basic HarnessAgent (no .harness/)."""
         full_msgs = list(messages)
         if self._agent.system_prompt and (
             not full_msgs or not isinstance(full_msgs[0], SystemMessage)
@@ -913,6 +1370,21 @@ class CLIAgent:
             tool_calls_in_progress: dict[int, dict[str, Any]] = {}
             indicator_shown: str | None = None  # "thinking" | "planning" | None
             text_streamed: bool = False  # track if any text was output this iteration
+
+            # Fire pre_llm_call hooks
+            thread_id = config.get("configurable", {}).get("thread_id", "default")
+            self._fire_hook(
+                HookEvent.PRE_LLM_CALL,
+                {
+                    "session_id": thread_id,
+                    "model": getattr(llm_with_tools, "model_name", "?"),
+                    "messages_count": len(full_msgs),
+                    "timestamp": time.strftime(
+                        "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                    ),
+                },
+            )
+            stream_start = time.perf_counter()
 
             async for chunk in llm_with_tools.astream(full_msgs, config):
                 # Merge chunks
@@ -1004,6 +1476,23 @@ class CLIAgent:
             usage_meta: dict[str, Any] = getattr(accumulated, "usage_metadata", None) or {}
             input_tokens = usage_meta.get("input_tokens", 0)
             output_tokens = usage_meta.get("output_tokens", 0)
+
+            # Fire post_llm_call hooks
+            stream_elapsed_ms = int(
+                (time.perf_counter() - stream_start) * 1000
+            )
+            self._fire_hook(
+                HookEvent.POST_LLM_CALL,
+                {
+                    "session_id": thread_id,
+                    "model": getattr(llm_with_tools, "model_name", "?"),
+                    "tokens_used": int(
+                        input_tokens + output_tokens
+                    ),
+                    "duration_ms": stream_elapsed_ms,
+                    "success": accumulated is not None,
+                },
+            )
             total_tokens = usage_meta.get("total_tokens", 0)
             if not total_tokens:
                 total_tokens = input_tokens + output_tokens
@@ -1068,6 +1557,34 @@ class CLIAgent:
                 tool_args = tc.get("args", {})
                 tool_id = tc.get("id", "")
 
+                # Fire pre_tool_call hooks — may block execution
+                pre_result = self._fire_hook(
+                    HookEvent.PRE_TOOL_CALL,
+                    {
+                        "session_id": thread_id,
+                        "tool_name": tool_name,
+                        "tool_args": tool_args,
+                        "timestamp": time.strftime(
+                            "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                        ),
+                    },
+                )
+                if not pre_result.allowed:
+                    blocked_msg = (
+                        f"Tool '{tool_name}' blocked by hook: "
+                        + "; ".join(pre_result.messages)
+                    )
+                    print(
+                        f"\n  {Color.warn('🚫 ' + blocked_msg)}"
+                    )
+                    tool_msgs.append(
+                        ToolMessage(
+                            content=blocked_msg,
+                            tool_call_id=tool_id,
+                        )
+                    )
+                    continue
+
                 # Draw the top half of the tool box immediately
                 box_w = _draw_tool_box_top(tool_name, tool_args)
 
@@ -1086,6 +1603,21 @@ class CLIAgent:
                     )
 
                 elapsed_ms = (time.perf_counter() - t0) * 1000
+
+                # Fire post_tool_call hooks
+                self._fire_hook(
+                    HookEvent.POST_TOOL_CALL,
+                    {
+                        "session_id": thread_id,
+                        "tool_name": tool_name,
+                        "tool_args": tool_args,
+                        "tool_result": (
+                            msg if isinstance(msg, str) else str(msg)
+                        ),
+                        "duration_ms": int(elapsed_ms),
+                        "success": not error,
+                    },
+                )
 
                 # Record tool call metrics for the monitoring dashboard
                 self._metrics.record_tool_call(
@@ -1150,97 +1682,138 @@ class CLIAgent:
         self._print_welcome(history)
         self._print_context_bar(history)
 
-        while True:
-            try:
-                user_input = _draw_chat_input()
-            except (EOFError, KeyboardInterrupt):
-                print("\nGoodbye!")
-                break
+        # Fire session_start hooks
+        self._fire_hook(
+            HookEvent.SESSION_START,
+            {
+                "session_id": thread_id,
+                "project_root": str(
+                    Path(self.config.project_root).resolve()
+                ),
+                "config": {
+                    "model": getattr(self._llm, "model_name", "?"),
+                },
+                "timestamp": time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                ),
+            },
+        )
 
-            if not user_input.strip():
-                continue
-
-            # Dispatch slash commands
-            if user_input.startswith("/"):
-                handled = await self._dispatch_command(
-                    user_input, history, conversation_key
-                )
-                if handled == "exit":
+        success = True
+        try:
+            while True:
+                try:
+                    user_input = _draw_chat_input()
+                except (EOFError, KeyboardInterrupt):
+                    print("\nGoodbye!")
                     break
-                # Refresh history after commands that may modify it
-                saved = self._memory.get(conversation_key)
-                history = saved if saved else []
-                continue
 
-            # Plain-text commands (backward compatibility)
-            if user_input.lower() in ("exit", "quit"):
-                print("Goodbye!")
-                break
-            if user_input.lower() == "help":
-                self._print_help()
-                continue
-            if user_input.lower() == "clear":
-                history = []
-                self._memory.delete(conversation_key)
-                print("Conversation cleared.")
-                continue
-            if user_input.lower() == "memory":
-                self._print_memory()
-                continue
+                if not user_input.strip():
+                    continue
 
-            # Build messages: history + new user message
-            messages = [
-                *history,
-                HumanMessage(content=user_input),
-            ]
-
-            # Record user message to dashboard activity feed
-            if self._bridge:
-                self._bridge.activity("user_msg", content=user_input[:200], thread=thread_id)
-
-            self._metrics.record_task_start()
-            turn_start = time.perf_counter()
-
-            text_response, updated_msgs = await self._stream_turn(
-                messages, config
-            )
-
-            turn_elapsed_ms = (time.perf_counter() - turn_start) * 1000
-            self._metrics.record_task_complete(turn_elapsed_ms)
-
-            # Record to shared CLI metrics server for dashboard UI
-            if self._bridge:
-                self._bridge.activity(
-                    "turn_end",
-                    latency_ms=round(turn_elapsed_ms, 1),
-                    thread=thread_id,
-                )
-                self._bridge.session(thread_id, turns=1)
-
-            if text_response is None and updated_msgs:
-                # Try to extract text from last AI message
-                for msg in reversed(updated_msgs):
-                    if isinstance(msg, AIMessage):
-                        text_response = str(msg.content) if msg.content else ""
+                # Dispatch slash commands
+                if user_input.startswith("/"):
+                    handled = await self._dispatch_command(
+                        user_input, history, conversation_key
+                    )
+                    if handled == "exit":
                         break
+                    # Refresh history after commands that may modify it
+                    saved = self._memory.get(conversation_key)
+                    history = saved if saved else []
+                    continue
 
-            # Update history with the exchange
-            history.append(HumanMessage(content=user_input))
-            if text_response is not None:
-                history.append(AIMessage(content=text_response))
+                # Plain-text commands (backward compatibility)
+                if user_input.lower() in ("exit", "quit"):
+                    print("Goodbye!")
+                    break
+                if user_input.lower() == "help":
+                    self._print_help()
+                    continue
+                if user_input.lower() == "clear":
+                    history = []
+                    self._memory.delete(conversation_key)
+                    print("Conversation cleared.")
+                    continue
+                if user_input.lower() == "memory":
+                    self._print_memory()
+                    continue
 
-            # Persist to memory
-            if self.config.enable_memory:
-                self._memory.store(conversation_key, history)
-                turn_key = f"turn:{thread_id}:{len(history)}"
-                self._memory.store(
-                    turn_key,
-                    {"user": user_input, "assistant": text_response or "(tool only)"},
+                # Build messages: history + new user message
+                messages = [
+                    *history,
+                    HumanMessage(content=user_input),
+                ]
+
+                # Record user message to dashboard activity feed
+                if self._bridge:
+                    self._bridge.activity(
+                        "user_msg", content=user_input[:200], thread=thread_id
+                    )
+
+                self._metrics.record_task_start()
+                turn_start = time.perf_counter()
+
+                text_response, updated_msgs = await self._stream_turn(
+                    messages, config
                 )
 
-            # Push full metrics snapshot (client mode syncs to aggregator)
-            if self._bridge:
-                self._bridge.push_metrics(self._metrics.to_dict())
+                turn_elapsed_ms = (time.perf_counter() - turn_start) * 1000
+                self._metrics.record_task_complete(turn_elapsed_ms)
+
+                # Record to shared CLI metrics server for dashboard UI
+                if self._bridge:
+                    self._bridge.activity(
+                        "turn_end",
+                        latency_ms=round(turn_elapsed_ms, 1),
+                        thread=thread_id,
+                    )
+                    self._bridge.session(thread_id, turns=1)
+
+                if text_response is None and updated_msgs:
+                    # Try to extract text from last AI message
+                    for msg in reversed(updated_msgs):
+                        if isinstance(msg, AIMessage):
+                            text_response = (
+                                str(msg.content) if msg.content else ""
+                            )
+                            break
+
+                # Update history with the exchange
+                history.append(HumanMessage(content=user_input))
+                if text_response is not None:
+                    history.append(AIMessage(content=text_response))
+
+                # Persist to memory
+                if self.config.enable_memory:
+                    self._memory.store(conversation_key, history)
+                    turn_key = f"turn:{thread_id}:{len(history)}"
+                    self._memory.store(
+                        turn_key,
+                        {
+                            "user": user_input,
+                            "assistant": text_response or "(tool only)",
+                        },
+                    )
+
+                # Push full metrics snapshot (client mode syncs to aggregator)
+                if self._bridge:
+                    self._bridge.push_metrics(self._metrics.to_dict())
+
+        finally:
+            # Fire session_end hooks on every exit path
+            self._fire_hook(
+                HookEvent.SESSION_END,
+                {
+                    "session_id": thread_id,
+                    "total_tokens": self._metrics.total_tokens,
+                    "tool_calls_count": self._metrics.tool_calls,
+                    "duration_ms": int(
+                        (time.monotonic() - self._start_time) * 1000
+                    ),
+                    "success": success,
+                },
+            )
 
     # ------------------------------------------------------------------
     # Slash command system
@@ -1259,6 +1832,9 @@ class CLIAgent:
             "/clear": self._cmd_clear,
             "/context": self._cmd_context,
             "/memory": self._cmd_memory,
+            "/tools": self._cmd_tools,
+            "/harness": self._cmd_harness,
+            "/subagents": self._cmd_subagents,
             "/exit": self._cmd_exit,
             "/quit": self._cmd_exit,
         }
@@ -1281,6 +1857,9 @@ class CLIAgent:
             ("/clear", "Reset conversation — start a fresh session"),
             ("/context", "Show current session context and stats"),
             ("/memory", "Show memory store statistics"),
+            ("/tools", "List available tools and their descriptions"),
+            ("/harness", "Show loaded .harness/ configuration"),
+            ("/subagents", "List subagents from .harness/subagents/"),
             ("/exit, /quit", "Exit the CLI"),
         ]
         for cmd, desc in commands:
@@ -1360,10 +1939,97 @@ class CLIAgent:
         self._print_memory()
         return None
 
+    def _cmd_tools(
+        self, args: str, history: list, key: str
+    ) -> str | None:
+        """List all available tools with their descriptions."""
+        w = _box_width()
+        print(f"\n  {Color.tool('Available Tools')}")
+        print(f"  {Color.dim('─' * w)}")
+
+        for tool in self._agent._tools:
+            name = tool.name
+            desc = (tool.description or "No description").split("\n")[0]
+            # Truncate long descriptions
+            if len(desc) > 100:
+                desc = desc[:97] + "..."
+            print(f"  {Color.tool(name):<22} {Color.dim(desc)}")
+        print()
+        return None
+
     def _cmd_exit(self, args: str, history: list, key: str) -> str | None:
         """Exit the CLI."""
         print("Goodbye!")
         return "exit"
+
+    def _cmd_harness(
+        self, args: str, history: list, key: str
+    ) -> str | None:
+        """Show loaded .harness/ configuration status."""
+        harness_dir = Path(self.config.project_root) / ".harness"
+        if not harness_dir.is_dir():
+            msg = "No .harness/ directory found."
+            print(f"\n  {Color.dim(msg)}\n")
+            return None
+
+        w = _box_width()
+        print(f"\n  {Color.tool('Harness Configuration')}")
+        print(f"  {Color.dim('─' * w)}")
+        print(f"  {Color.dim('Directory:')}   {harness_dir}")
+
+        if self._harness_config:
+            print(
+                f"  {Color.dim('Model:')}       "
+                f"{self._harness_config.model}"
+            )
+            print(
+                f"  {Color.dim('Sandbox:')}     "
+                f"{self._harness_config.features.sandbox_type}"
+            )
+
+        skills_n = len(self._harness_skill_sources)
+        rules_n = len(self._harness_rule_sources)
+        subs_n = len(self._harness_subagent_defs)
+        hooks_n = self._event_bus.listener_count
+
+        print(f"  {Color.dim('Skills:')}      {skills_n} loaded")
+        print(f"  {Color.dim('Rules:')}       {rules_n} loaded")
+        print(f"  {Color.dim('Subagents:')}   {subs_n} loaded")
+        print(f"  {Color.dim('Hooks:')}       {hooks_n} registered")
+        print()
+        return None
+
+    def _cmd_subagents(
+        self, args: str, history: list, key: str
+    ) -> str | None:
+        """List subagents discovered from .harness/subagents/."""
+        if not self._harness_subagent_defs:
+            print(f"\n  {Color.dim('No subagents configured.')}")
+            print(
+                "  "
+                + Color.dim(
+                    "Add .yaml files to .harness/subagents/ "
+                    "to define subagents."
+                )
+            )
+            return None
+
+        w = _box_width()
+        print(f"\n  {Color.tool('Subagents')}")
+        print(f"  {Color.dim('─' * w)}")
+        for sub in self._harness_subagent_defs:
+            name = sub["name"]
+            desc = sub.get("description", "")
+            tools_n = len(sub.get("tools", []))
+            model = sub.get("model", "?")
+            print(
+                f"  {Color.tool(name):<24} "
+                f"{Color.muted(f'{tools_n} tools · {model}')}"
+            )
+            if desc:
+                print(f"  {' ' * 2}{Color.dim(desc[:120])}")
+        print()
+        return None
 
     # ------------------------------------------------------------------
     # Display helpers
@@ -1408,6 +2074,19 @@ class CLIAgent:
         ))
         info = f"Memory: {mem}  ·  {tools_n} tools  ·  model: {model}"
         print(_box_line(Color.muted(info), dim=True))
+
+        # Show harness info if loaded
+        harness_dir = Path(self.config.project_root) / ".harness"
+        if harness_dir.is_dir():
+            skills_n = len(self._harness_skill_sources)
+            rules_n = len(self._harness_rule_sources)
+            subs_n = len(self._harness_subagent_defs)
+            harness_info = (
+                f"harness: {skills_n} skills · {rules_n} rules · "
+                f"{subs_n} subagents"
+            )
+            print(_box_line(Color.muted(harness_info), dim=True))
+
         if self._metrics_server is not None:
             dash_url = f"http://localhost:{self.config.monitoring_port}/ui"
             print(_box_line(

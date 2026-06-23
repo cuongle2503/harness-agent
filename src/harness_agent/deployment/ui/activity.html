@@ -78,7 +78,7 @@ nav a.on{background:#eff6ff;color:var(--blue)}
 /* ── Node cards (ERD entity style) ──────────────────────────── */
 .node{
   position:absolute;z-index:2;
-  min-width:140px;
+  min-width:130px;
   background:var(--surface);
   border:2px solid #e2e6ec;
   border-radius:var(--radius);
@@ -90,36 +90,44 @@ nav a.on{background:#eff6ff;color:var(--blue)}
 .node.dragging{z-index:50;box-shadow:0 8px 32px rgba(0,0,0,.12);transition:none}
 .node .head{
   display:flex;align-items:center;gap:7px;
-  padding:9px 14px;
-  font-size:.73rem;font-weight:700;
+  padding:7px 12px;
+  font-size:.7rem;font-weight:700;
   border-bottom:1px solid #eef0f4;
   letter-spacing:-.01em;
 }
-.node .head .ico{font-size:.95rem;line-height:1}
-.node .body{padding:9px 14px;font-size:.68rem;color:var(--t2)}
+.node .head .ico{font-size:.9rem;line-height:1}
+.node .body{padding:7px 12px;font-size:.64rem;color:var(--t2)}
 
 /* Entity type tag */
 .node .tag{
-  display:inline-block;font-size:.55rem;font-weight:600;
+  display:inline-block;font-size:.52rem;font-weight:600;
   text-transform:uppercase;letter-spacing:.05em;
-  padding:2px 7px;border-radius:3px;
+  padding:2px 6px;border-radius:3px;
   background:#f1f5f9;color:var(--t3);
 }
 
 /* Color themes per node */
-.node.user  {border-color:#93c5fd} .node.user  .head{border-bottom-color:#dbeafe} .node.user  .head .ico{color:#2563eb}
-.node.sys   {border-color:#cbd5e1} .node.sys   .head{border-bottom-color:#e2e8f0} .node.sys   .head .ico{color:#64748b}
-.node.llm   {border-color:#c4b5fd} .node.llm   .head{border-bottom-color:#ede9fe} .node.llm   .head .ico{color:#7c3aed}
-.node.tools {border-color:#67e8f9} .node.tools .head{border-bottom-color:#cffafe} .node.tools .head .ico{color:#0891b2}
-.node.output{border-color:#fcd34d} .node.output.head{border-bottom-color:#fef3c7} .node.output.head .ico{color:#d97706}
+.node.user    {border-color:#93c5fd} .node.user    .head{border-bottom-color:#dbeafe} .node.user    .head .ico{color:#2563eb}
+.node.sys     {border-color:#cbd5e1} .node.sys     .head{border-bottom-color:#e2e8f0} .node.sys     .head .ico{color:#64748b}
+.node.llm     {border-color:#c4b5fd} .node.llm     .head{border-bottom-color:#ede9fe} .node.llm     .head .ico{color:#7c3aed}
+.node.tools   {border-color:#67e8f9} .node.tools   .head{border-bottom-color:#cffafe} .node.tools   .head .ico{color:#0891b2}
+.node.output  {border-color:#fcd34d} .node.output  .head{border-bottom-color:#fef3c7} .node.output  .head .ico{color:#d97706}
+.node.skill   {border-color:#86efac} .node.skill   .head{border-bottom-color:#dcfce7} .node.skill   .head .ico{color:#16a34a}
+.node.rule    {border-color:#fdba74} .node.rule    .head{border-bottom-color:#fff7ed} .node.rule    .head .ico{color:#ea580c}
+.node.hook    {border-color:#f9a8d4} .node.hook    .head{border-bottom-color:#fce7f3} .node.hook    .head .ico{color:#db2777}
+.node.subagent{border-color:#a5b4fc} .node.subagent.head{border-bottom-color:#eef2ff} .node.subagent.head .ico{color:#4f46e5}
 
 /* Active glow */
 .node.active{border-width:2px}
-.node.active.user  {border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
-.node.active.sys   {border-color:#64748b;box-shadow:0 0 0 3px rgba(100,116,139,.10)}
-.node.active.llm   {border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}
-.node.active.tools {border-color:#0891b2;box-shadow:0 0 0 3px rgba(8,145,178,.12)}
-.node.active.output{border-color:#d97706;box-shadow:0 0 0 3px rgba(217,119,6,.12)}
+.node.active.user    {border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.node.active.sys     {border-color:#64748b;box-shadow:0 0 0 3px rgba(100,116,139,.10)}
+.node.active.llm     {border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+.node.active.tools   {border-color:#0891b2;box-shadow:0 0 0 3px rgba(8,145,178,.12)}
+.node.active.output  {border-color:#d97706;box-shadow:0 0 0 3px rgba(217,119,6,.12)}
+.node.active.skill   {border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.12)}
+.node.active.rule    {border-color:#ea580c;box-shadow:0 0 0 3px rgba(234,88,12,.12)}
+.node.active.hook    {border-color:#db2777;box-shadow:0 0 0 3px rgba(219,39,119,.12)}
+.node.active.subagent{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.12)}
 
 /* Pulse indicator */
 .node .pulse{
@@ -134,6 +142,10 @@ nav a.on{background:#eff6ff;color:var(--blue)}
 .node.tools .pulse{background:#0891b2}
 .node.output .pulse{background:#d97706}
 .node.sys .pulse{background:#64748b}
+.node.skill .pulse{background:#16a34a}
+.node.rule .pulse{background:#ea580c}
+.node.hook .pulse{background:#db2777}
+.node.subagent .pulse{background:#4f46e5}
 
 /* Latency inline */
 .node .latency{
@@ -227,10 +239,38 @@ footer{
     <div class="pulse"></div>
   </div>
 
+  <!-- Skills — on-demand procedural workflows (progressive disclosure) -->
+  <div class="node skill" id="nd-skill">
+    <div class="head"><span class="ico">📚</span>Skills</div>
+    <div class="body"><span class="tag">on-demand</span> <span id="nd-skill-info">0 skills</span></div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- Rules — always-loaded constraints (every session, every turn) -->
+  <div class="node rule" id="nd-rule">
+    <div class="head"><span class="ico">📐</span>Rules</div>
+    <div class="body"><span class="tag">always-on</span> <span id="nd-rule-info">0 rules</span></div>
+    <div class="pulse"></div>
+  </div>
+
   <!-- LLM -->
   <div class="node llm" id="nd-llm">
     <div class="head"><span class="ico">🧠</span>DeepSeek V4</div>
     <div class="body"><span class="tag">orchestrator</span> reason + decide<span class="latency" id="lat-llm"></span></div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- Subagents — spawned by LLM -->
+  <div class="node subagent" id="nd-subagent">
+    <div class="head"><span class="ico">🤖</span>Subagents</div>
+    <div class="body"><span class="tag">isolated</span> <span id="nd-subagent-info">0 subagents</span></div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- Hooks — lifecycle events (17 events, can block with exit code 2) -->
+  <div class="node hook" id="nd-hook">
+    <div class="head"><span class="ico">🪝</span>Hooks</div>
+    <div class="body"><span class="tag">lifecycle</span> <span id="nd-hook-info">0 hooks</span></div>
     <div class="pulse"></div>
   </div>
 
@@ -264,21 +304,39 @@ const API = '';
 // NODE DEFINITIONS
 // ═════════════════════════════════════════════════════════════
 const NODES = [
-  { id:'user',   el:'nd-user',   xPct:3,  yPct:22 },
-  { id:'sys',    el:'nd-sys',    xPct:3,  yPct:68 },
-  { id:'llm',    el:'nd-llm',    xPct:33, yPct:18 },
-  { id:'tools',  el:'nd-tools',  xPct:33, yPct:66 },
-  { id:'output', el:'nd-output', xPct:67, yPct:22 },
+  { id:'user',     el:'nd-user',     xPct:3,  yPct:10 },
+  { id:'sys',      el:'nd-sys',      xPct:3,  yPct:34 },
+  { id:'skill',    el:'nd-skill',    xPct:3,  yPct:58 },
+  { id:'rule',     el:'nd-rule',     xPct:3,  yPct:78 },
+  { id:'llm',      el:'nd-llm',      xPct:33, yPct:10 },
+  { id:'subagent', el:'nd-subagent', xPct:33, yPct:38 },
+  { id:'tools',    el:'nd-tools',    xPct:33, yPct:68 },
+  { id:'hook',     el:'nd-hook',     xPct:50, yPct:62 },
+  { id:'output',   el:'nd-output',   xPct:67, yPct:14 },
 ];
 
-// Edges — offset prevents overlapping bidirectional lines
+// Edges — shows actual data flow based on real architecture
 const EDGES = [
-  { from:'user',   to:'llm',    label:'input',     off:0 },
-  { from:'sys',    to:'llm',    label:'prompt',    off:0 },
-  { from:'llm',    to:'tools',  label:'tool call', off:-26 },
-  { from:'tools',  to:'llm',    label:'result',    off:26 },
-  { from:'llm',    to:'output', label:'response',  off:0 },
-  { from:'output', to:'user',   label:'reply',     off:0 },
+  // User → LLM (input)
+  { from:'user',     to:'llm',      label:'input',       off:0 },
+  // System prompt feeds LLM
+  { from:'sys',      to:'llm',      label:'prompt',      off:0 },
+  // Rules → System Prompt: always loaded, re-injected on compaction
+  { from:'rule',     to:'sys',      label:'always',      off:0 },
+  // Skills → System Prompt: progressive disclosure (desc always, body on invoke)
+  { from:'skill',    to:'sys',      label:'on-demand',   off:0 },
+  // LLM ↔ Tools: direct call/result (hooks fire PRE/POST events)
+  { from:'llm',      to:'tools',    label:'tool call',   off:-26 },
+  { from:'tools',    to:'llm',      label:'result',      off:26 },
+  // Hooks intercept lifecycle events (PreToolUse can block with exit code 2)
+  { from:'llm',      to:'hook',     label:'lifecycle',   off:0 },
+  { from:'tools',    to:'hook',     label:'lifecycle',   off:0 },
+  // LLM ↔ Subagents: context-isolated, only final message returns
+  { from:'llm',      to:'subagent', label:'spawn',       off:-24 },
+  { from:'subagent', to:'llm',      label:'summary',     off:24 },
+  // LLM → Output → User
+  { from:'llm',      to:'output',   label:'response',    off:0 },
+  { from:'output',   to:'user',     label:'reply',       off:0 },
 ];
 
 // Start with server's BASIC_TOOLS — new tools auto-added on first use
@@ -345,21 +403,18 @@ function layout() {
 // ═════════════════════════════════════════════════════════════
 // DRAW CONNECTIONS — straight lines, clean & simple
 // ═════════════════════════════════════════════════════════════
-const COLORS = {user:'#2563eb',sys:'#64748b',llm:'#7c3aed',tools:'#0891b2',output:'#d97706'};
+const COLORS = {user:'#2563eb',sys:'#64748b',skill:'#16a34a',rule:'#ea580c',llm:'#7c3aed',subagent:'#4f46e5',hook:'#db2777',tools:'#0891b2',output:'#d97706'};
 
 function pickPorts(f, t) {
-  // Pick best exit (from) and entry (to) ports for a straight line
   const dx = t.cx - f.cx;
   const dy = t.cy - f.cy;
 
   let x1, y1, x2, y2;
   if (Math.abs(dx) > Math.abs(dy)) {
-    // Horizontal dominant
     if (dx > 0) { x1 = f.right; x2 = t.left; }
     else        { x1 = f.left;  x2 = t.right; }
     y1 = f.cy; y2 = t.cy;
   } else {
-    // Vertical dominant
     if (dy > 0) { y1 = f.bottom; y2 = t.top; }
     else        { y1 = f.top;    y2 = t.bottom; }
     x1 = f.cx; x2 = t.cx;
@@ -387,17 +442,12 @@ function drawEdges() {
     let x1, y1, x2, y2;
 
     if (e.off !== 0) {
-      // Bidirectional: use opposite sides so lines are parallel & distinct
-      // off < 0 → right side; off > 0 → left side
       const side = e.off < 0 ? 1 : -1;
       const gap = Math.abs(e.off);
-      // Exit/enter based on direction: from→to
       if (f.cy < t.cy) {
-        // Downward: exit bottom of from, enter top of to
         x1 = f.cx + side * gap; y1 = f.bottom;
         x2 = t.cx + side * gap; y2 = t.top;
       } else {
-        // Upward: exit top of from, enter bottom of to
         x1 = f.cx + side * gap; y1 = f.top;
         x2 = t.cx + side * gap; y2 = t.bottom;
       }
@@ -416,11 +466,9 @@ function drawEdges() {
             stroke="${c}" stroke-width="2.5" stroke-linecap="round"
             opacity="0.55" marker-end="url(#m${mid})"/>`;
 
-    // Label at midpoint, offset perpendicular
     const mx = (x1 + x2) / 2;
     const my = (y1 + y2) / 2;
     const angle = Math.atan2(y2 - y1, x2 - x1);
-    // For bidirectional: push label further out on same side
     const lox = e.off !== 0 ? -Math.sin(angle) * (e.off < 0 ? -22 : 22)
                             : -Math.sin(angle) * 12;
     const loy = e.off !== 0 ? Math.cos(angle) * 0
@@ -525,7 +573,6 @@ function animateParticles(ts) {
     p.t += p.speed;
     if (p.t >= 1) return false;
     const t = p.t;
-    // Straight line interpolation
     const px = p.sx + (p.ex - p.sx) * t;
     const py = p.sy + (p.ey - p.sy) * t;
     const alpha = t < 0.10 ? t/0.10 : (t > 0.75 ? (1-t)/0.25 : 1);
@@ -631,24 +678,52 @@ function process(e) {
       spawn('sys', 'llm');
       toast('🧠 LLM reasoning…');
       break;
+    case 'skill_used':
+      activate('skill', 0.8);
+      spawn('skill', 'sys');
+      toast(`📚 Skill: ${e.name||'?'}`);
+      break;
+    case 'rule_applied':
+      activate('rule', 0.6);
+      spawn('rule', 'sys');
+      toast(`📐 Rule: ${e.name||'?'}`);
+      break;
+    case 'hook_fired':
+      // Hook fires PRE/POST events — it intercepts, doesn't forward
+      activate('hook', 0.9);
+      toast(`🪝 Hook: ${e.name||'?'} (${e.event||'?'})`);
+      break;
+    case 'subagent_start':
+      activate('subagent', 1);
+      spawn('llm', 'subagent');
+      toast(`🤖 Subagent: ${e.name||'?'}`);
+      break;
+    case 'subagent_end':
+      pulse('subagent');
+      spawn('subagent', 'llm');
+      toast(`🤖 Subagent done: ${e.name||'?'}`);
+      break;
     case 'tool_start':
       activate('tools', 1);
+      activate('hook', 0.4);
       spawn('llm', 'tools');
+      spawn('llm', 'hook');   // hook intercept event (PRE_TOOL_CALL)
       if (!active['tools']) active['tools'] = { toolCalls:{} };
       if (!active['tools'].toolCalls) active['tools'].toolCalls = {};
       const tn = e.name || '?';
       active['tools'].toolCalls[tn] = (active['tools'].toolCalls[tn]||0) + 1;
       active['tools'].lastTool = tn;
       active['tools'].lastInput = e.input || '';
-      // Auto-add unknown tools on first use
-	if (!toolBadgeEls[tn]) renderToolBadge(tn);
-	updateBadges(tn);
+      if (!toolBadgeEls[tn]) renderToolBadge(tn);
+      updateBadges(tn);
       stats.tools++;
       toast(`🔧 ${tn}(${(e.input||'').substring(0,50)})`);
       break;
     case 'tool_end':
       pulse('tools');
-      spawn('tools', 'llm');     // tool result → back to LLM
+      pulse('hook');
+      spawn('tools', 'llm');
+      spawn('tools', 'hook');  // hook intercept event (POST_TOOL_CALL)
       if (!active['tools']) active['tools'] = { toolCalls:{} };
       active['tools'].lastLatency = e.latency_ms || 0;
       showLatency('tools', e.latency_ms);
@@ -656,8 +731,8 @@ function process(e) {
     case 'turn_end':
       stats.turns++;
       activate('output', 1);
-      spawn('llm', 'output');    // LLM final → response
-      spawn('output', 'user');   // response → user
+      spawn('llm', 'output');
+      spawn('output', 'user');
       showLatency('output', e.latency_ms);
       toast(`📤 ${e.tokens||0} tokens · ${e.tool_calls||0} tool calls · ${(e.latency_ms||0).toFixed(0)}ms`);
       break;
@@ -669,7 +744,6 @@ function updateBadges(toolName) {
   const b = toolBadgeEls[toolName];
   if (!b) return;
   b.classList.add('hit');
-  // Auto-fade back to gray after 3s
   clearTimeout(badgeTimers[toolName]);
   badgeTimers[toolName] = setTimeout(() => b.classList.remove('hit'), 3000);
 }
@@ -689,13 +763,13 @@ function esc(s) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// SESSION SELECTOR — filter data by session (no redirect, single port)
+// SESSION SELECTOR
 // ═════════════════════════════════════════════════════════════
 let currentSession = '';
 
 async function loadSessions() {
   try {
-    const res = await fetch(`${API}/registry`);
+    const res = await fetch(`${API}/sessions`);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const sessions = await res.json();
     const sel = document.getElementById('session-selector');
@@ -706,8 +780,8 @@ async function loadSessions() {
       sel.innerHTML += '<option disabled>-- no sessions --</option>';
     } else {
       sessions.forEach(s => {
-        const label = esc(s.name + ' (:' + s.session_id + ')');
-        sel.innerHTML += '<option value="' + s.session_id + '">' + label + '</option>';
+        const label = esc(s.thread_id + ' (' + s.turns + ' turns)');
+        sel.innerHTML += '<option value="' + s.thread_id + '">' + label + '</option>';
       });
     }
     if (current && [...sel.options].some(o => o.value === current)) {
@@ -715,13 +789,33 @@ async function loadSessions() {
     }
   } catch (_) {
     const sel = document.getElementById('session-selector');
-    if (sel) sel.innerHTML = '<option value="">🖥 Default session</option><option disabled>-- registry unavailable --</option>';
+    if (sel) sel.innerHTML = '<option value="">🖥 Default session</option><option disabled>-- sessions unavailable --</option>';
   }
 }
 
 function switchSession(sid) {
   currentSession = sid;
   poll();
+}
+
+// ═════════════════════════════════════════════════════════════
+// HARNESS DATA — populate node info text
+// ═════════════════════════════════════════════════════════════
+async function loadHarnessInfo() {
+  try {
+    const res = await fetch(`${API}/harness`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const setInfo = (id, list) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = (list || []).length + ' ' + id.replace('nd-','').replace('-info','');
+    };
+    setInfo('nd-skill-info', data.skills);
+    setInfo('nd-rule-info', data.rules);
+    setInfo('nd-hook-info', data.hooks);
+    setInfo('nd-subagent-info', data.subagents);
+  } catch (_) {}
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -735,9 +829,12 @@ async function init() {
   resetAllBadges();
   setInterval(poll, 1000);
   document.fonts.ready.then(() => layout());
-  // Session registry — refresh every 5s
+  // Session list — refresh every 5s
   loadSessions();
   setInterval(loadSessions, 5000);
+  // Harness info — load once, refresh every 15s
+  loadHarnessInfo();
+  setInterval(loadHarnessInfo, 15000);
 }
 
 function resetAllBadges() {
