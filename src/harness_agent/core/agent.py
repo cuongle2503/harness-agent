@@ -62,7 +62,31 @@ class HarnessAgent(Runnable[dict[str, Any], dict[str, Any]]):
                 try:
                     result = tool.invoke(tool_args, config)
                     msg = str(result)
-                except Exception as e:
+                except (ValueError, RuntimeError, TypeError) as e:
+                    logger.warning("Tool '%s' failed: %s", tool_name, e)
+                    msg = f"Tool error: {e}"
+            results.append(ToolMessage(content=msg, tool_call_id=tool_id))
+        return results
+
+    async def _aexecute_tools(
+        self, tool_calls: list[dict[str, Any]],
+        config: RunnableConfig | None = None,
+    ) -> list[ToolMessage]:
+        """Async version of _execute_tools — does not block the event loop."""
+        results: list[ToolMessage] = []
+        for tc in tool_calls:
+            tool_name = tc.get("name", "")
+            tool_args = tc.get("args", {})
+            tool_id = tc.get("id", "")
+            tool = self._tool_map.get(tool_name)
+            if tool is None:
+                msg = f"Unknown tool: {tool_name}"
+            else:
+                try:
+                    result = await tool.ainvoke(tool_args, config)
+                    msg = str(result)
+                except (ValueError, RuntimeError, TypeError) as e:
+                    logger.warning("Tool '%s' failed: %s", tool_name, e)
                     msg = f"Tool error: {e}"
             results.append(ToolMessage(content=msg, tool_call_id=tool_id))
         return results
@@ -118,7 +142,7 @@ class HarnessAgent(Runnable[dict[str, Any], dict[str, Any]]):
             if not tool_calls:
                 return {"messages": messages}
 
-            tool_msgs = self._execute_tools(tool_calls, config)
+            tool_msgs = await self._aexecute_tools(tool_calls, config)
             messages.extend(tool_msgs)
 
         logger.warning(

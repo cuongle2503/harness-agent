@@ -301,7 +301,7 @@ class ConfigLoader:
 
     # ── Private helpers ─────────────────────────────────────────────────
 
-    def _parse(self, raw: dict) -> HarnessConfig:
+    def _parse(self, raw: dict[str, Any]) -> HarnessConfig:
         """Parse a raw config dict into a ``HarnessConfig``."""
         return HarnessConfig(
             # Model
@@ -339,7 +339,7 @@ class ConfigLoader:
         )
 
     def _parse_middleware_params(
-        self, raw: dict
+        self, raw: dict[str, Any]
     ) -> list[MiddlewareParamConfig]:
         """Parse ``middleware_params`` section."""
         return [
@@ -347,7 +347,7 @@ class ConfigLoader:
             for name, params in raw.items()
         ]
 
-    def _parse_backend(self, raw: dict) -> BackendConfig:
+    def _parse_backend(self, raw: dict[str, Any]) -> BackendConfig:
         """Parse ``backend`` section."""
         routes_raw = raw.get("routes", {})
         routes = [
@@ -361,7 +361,7 @@ class ConfigLoader:
         )
 
     @staticmethod
-    def _parse_features(raw: dict) -> FeaturesConfig:
+    def _parse_features(raw: dict[str, Any]) -> FeaturesConfig:
         """Parse ``features`` section."""
         return FeaturesConfig(
             enable_shell=raw.get("enable_shell", False),
@@ -371,7 +371,7 @@ class ConfigLoader:
         )
 
     @staticmethod
-    def _parse_security(raw: dict) -> SecurityConfig:
+    def _parse_security(raw: dict[str, Any]) -> SecurityConfig:
         """Parse ``security`` section."""
         return SecurityConfig(
             shell_allow_list=raw.get("shell_allow_list", []),

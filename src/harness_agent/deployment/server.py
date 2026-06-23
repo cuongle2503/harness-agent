@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -139,20 +140,20 @@ class _MetricsCallback(BaseCallbackHandler):
     def __init__(self, metrics: AgentMetrics) -> None:
         super().__init__()
         self._metrics = metrics
-        self._tool_starts: dict[str, tuple[float, str, str]] = {}
+        self._tool_starts: dict[UUID, tuple[float, str, str]] = {}
         self.llm_call_count: int = 0
         self.tool_call_count: int = 0
 
     def on_llm_start(
         self, serialized: dict[str, Any], prompts: list[str], *,
-        run_id: str, **kwargs: Any,
+        run_id: UUID, **kwargs: Any,
     ) -> None:
         """Count each LLM API call the agent makes."""
         self.llm_call_count += 1
 
     def on_tool_start(
         self, serialized: dict[str, Any], input_str: str, *,
-        run_id: str, **kwargs: Any,
+        run_id: UUID, **kwargs: Any,
     ) -> None:
         import time as _t
         tool_name = serialized.get("name", "unknown")
@@ -167,7 +168,7 @@ class _MetricsCallback(BaseCallbackHandler):
             _activity_log.pop(0)
 
     def on_tool_end(
-        self, output: Any, *, run_id: str, **kwargs: Any,
+        self, output: Any, *, run_id: UUID, **kwargs: Any,
     ) -> None:
         import time as _t
         entry = self._tool_starts.pop(run_id, None)
@@ -198,7 +199,7 @@ class _MetricsCallback(BaseCallbackHandler):
                 _activity_log.pop(0)
 
     def on_tool_error(
-        self, error: BaseException, *, run_id: str, **kwargs: Any,
+        self, error: BaseException, *, run_id: UUID, **kwargs: Any,
     ) -> None:
         import time as _t
         entry = self._tool_starts.pop(run_id, None)

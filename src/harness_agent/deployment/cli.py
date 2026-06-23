@@ -22,6 +22,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
+    BaseMessage,
     HumanMessage,
     SystemMessage,
     ToolMessage,
@@ -222,9 +223,6 @@ def _flicker_flame() -> str:
     color = _FLAME_FRAMES[_FLAME_TICK % len(_FLAME_FRAMES)]
     _FLAME_TICK += 1
     return f"{color}🔥{Color.RESET}"
-
-
-DEFAULT_MAX_TOOL_ITERATIONS = 50
 
 
 # ---------------------------------------------------------------------------
@@ -714,6 +712,7 @@ class CLIAgent:
         self._harness_subagent_defs: list[dict[str, Any]] = []
         self._harness_builder: Any = None  # HarnessBuilder | None
         self._event_bus = EventBus()
+        self._graph_tool_state: dict[str, Any] | None = None
         self._load_harness_if_present()
 
         # ── Initialize components (may use harness overrides) ──
@@ -1210,8 +1209,8 @@ class CLIAgent:
             pass
 
     async def _stream_turn(
-        self, messages: list, config: RunnableConfig
-    ) -> tuple[str | None, list]:
+        self, messages: list[BaseMessage], config: RunnableConfig
+    ) -> tuple[str | None, list[BaseMessage]]:
         """Stream a single agent turn with Claude-style tool display.
 
         Delegates to ``_stream_turn_graph`` when ``self._graph``
@@ -1231,8 +1230,8 @@ class CLIAgent:
         return await self._stream_turn_agent(messages, config)
 
     async def _stream_turn_graph(
-        self, messages: list, config: RunnableConfig
-    ) -> tuple[str | None, list]:
+        self, messages: list[BaseMessage], config: RunnableConfig
+    ) -> tuple[str | None, list[BaseMessage]]:
         """Stream a turn using CompiledStateGraph.astream_events().
 
         This path is used when ``HarnessBuilder.build()`` succeeded —
@@ -1272,7 +1271,7 @@ class CLIAgent:
         stream_start = time.perf_counter()
         final_text = ""
         tool_count = 0
-        last_messages: list = list(messages)
+        last_messages: list[BaseMessage] = list(messages)
 
         try:
             # Build input for CompiledStateGraph
@@ -1467,8 +1466,8 @@ class CLIAgent:
         return (final_text if final_text else None, last_messages)
 
     async def _stream_turn_agent(
-        self, messages: list, config: RunnableConfig
-    ) -> tuple[str | None, list]:
+        self, messages: list[BaseMessage], config: RunnableConfig
+    ) -> tuple[str | None, list[BaseMessage]]:
         """Manual LLM-loop streaming for basic HarnessAgent (no .harness/)."""
         full_msgs = list(messages)
         if self._agent.system_prompt and (

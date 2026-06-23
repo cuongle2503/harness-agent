@@ -443,7 +443,14 @@ class HookLoader:
                 )
                 return None
 
-            return module.handle
+            handle = module.handle
+            if not callable(handle):
+                logger.error(
+                    "Python hook %s: 'handle' is not callable", file
+                )
+                return None
+
+            return handle
 
         except Exception as e:
             logger.error("Failed to load hook %s: %s", file, e)

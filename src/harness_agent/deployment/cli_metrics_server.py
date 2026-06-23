@@ -223,7 +223,8 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         if length == 0:
             return {}
         raw = self.rfile.read(length)
-        return json.loads(raw.decode("utf-8"))
+        data = json.loads(raw.decode("utf-8"))
+        return data if isinstance(data, dict) else {}
 
     def _query_param(self, key: str, default: str = "") -> str:
         try:

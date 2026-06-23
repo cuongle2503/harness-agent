@@ -9,8 +9,8 @@
 - **File**: `src/harness_agent/core/agent.py:121`
 - **Issue**: `ainvoke` dùng `await self.llm.ainvoke()` nhưng gọi sync `_execute_tools()` → block event loop trên mọi tool I/O.
 - **Fix**:
-  - [ ] Tạo `async _aexecute_tools()` gọi `await tool.ainvoke(tool_args, config)`
-  - [ ] `ainvoke` dùng `_aexecute_tools` thay vì `_execute_tools`
+  - [x] Tạo `async _aexecute_tools()` gọi `await tool.ainvoke(tool_args, config)`
+  - [x] `ainvoke` dùng `_aexecute_tools` thay vì `_execute_tools`
 - **Test**: Async test verify event loop không bị block
 
 ---
@@ -20,9 +20,9 @@
 - **File**: `src/harness_agent/core/agent.py:65`
 - **Issue**: `except Exception as e` nuốt mọi error, convert thành string message không log.
 - **Fix**:
-  - [ ] Catch specific: `(ToolException, ValueError, RuntimeError)`
-  - [ ] `logger.warning("Tool %s failed: %s", tool_name, e)` trước khi convert
-  - [ ] Re-raise non-recoverable exceptions
+  - [x] Catch specific: `(ToolException, ValueError, RuntimeError)`
+  - [x] `logger.warning("Tool %s failed: %s", tool_name, e)` trước khi convert
+  - [x] Re-raise non-recoverable exceptions
 - **Test**: Mock tool raise → verify warning logged
 
 ---
@@ -32,8 +32,8 @@
 - **File**: `src/harness_agent/deployment/server.py:146,153`
 - **Issue**: `on_llm_start` và `on_tool_start` declare `run_id: str` nhưng LangChain truyền `UUID`. Tool latency metrics bị drop vì key mismatch.
 - **Fix**:
-  - [ ] `from uuid import UUID`
-  - [ ] Sửa signature: `run_id: UUID`
+  - [x] `from uuid import UUID`
+  - [x] Sửa signature: `run_id: UUID`
 - **Test**: Verify tool latency tracked correctly sau fix
 
 ---
@@ -44,7 +44,7 @@
   - `src/harness_agent/loaders/subagent_loader.py:295` — `raise SubAgentLoadError(...)`
   - `src/harness_agent/tools/basic_tools.py:38` — `raise ValueError(...)`
 - **Fix**:
-  - [ ] Thêm `from e` / `from exc` cho tất cả re-raise
+  - [x] Thêm `from e` / `from exc` cho tất cả re-raise
 - **Quy tắc**: ruff B904
 
 ---
@@ -54,7 +54,7 @@
 - **File**: `src/harness_agent/deployment/cli.py:227`
 - **Issue**: Module-level constant shadow import từ `harness_agent.core.agent`. ruff F811.
 - **Fix**:
-  - [ ] Xóa line 227, dùng import từ line 32
+  - [x] Xóa line 227, dùng import từ line 32
 
 ---
 
@@ -68,8 +68,8 @@
   - `evaluation/evaluator.py:90` — `agent: Any` → `Runnable`
   - `config.py:168` — return `Any` → `BaseChatModel`
 - **Fix**:
-  - [ ] Thêm type arguments cho tất cả bare collections
-  - [ ] Thay `Any` bằng proper protocol types
+  - [x] Thêm type arguments cho tất cả bare collections
+  - [x] Thay `Any` bằng proper protocol types
 
 ---
 
@@ -78,7 +78,7 @@
 - **File**: `src/harness_agent/loaders/harness_builder.py:297,374,449`
 - **Issue**: `assert self.config is not None` bị strip khi chạy `python -O`.
 - **Fix**:
-  - [ ] Thay bằng `if self.config is None: raise HarnessBuildError(...)`
+  - [x] Thay bằng `if self.config is None: raise HarnessBuildError(...)`
 
 ---
 
@@ -87,7 +87,7 @@
 - **File**: `src/harness_agent/deployment/cli.py:1343`
 - **Issue**: `self._graph_tool_state = {...}` set mid-method, không khai báo trong `__init__`.
 - **Fix**:
-  - [ ] Khai báo `self._graph_tool_state: dict[str, Any] | None = None` trong `__init__`
+  - [x] Khai báo `self._graph_tool_state: dict[str, Any] | None = None` trong `__init__`
 
 ---
 
@@ -96,7 +96,7 @@
 - **File**: `src/harness_agent/deployment/cli_metrics_server.py:225`
 - **Issue**: `json.loads()` trả `Any`. Nếu body là JSON array `[]` → crash khi caller gọi `.get()`.
 - **Fix**:
-  - [ ] `data = json.loads(raw); return data if isinstance(data, dict) else {}`
+  - [x] `data = json.loads(raw); return data if isinstance(data, dict) else {}`
 
 ---
 
@@ -105,14 +105,14 @@
 - **File**: `src/harness_agent/loaders/hook_loader.py:446`
 - **Issue**: `module.handle` là `Any`, không kiểm tra `callable()` trước khi return.
 - **Fix**:
-  - [ ] `if not callable(handle): logger.error(...); return None`
-  - [ ] `return cast(Callable[..., Any], handle)`
+  - [x] `if not callable(handle): logger.error(...); return None`
+  - [x] `return cast(Callable[..., Any], handle)`
 
 ---
 
 ## Checklist
 
-- [ ] All 10 fixes implemented
-- [ ] `mypy --strict` passes trên affected files
-- [ ] `ruff check` clean
-- [ ] Existing tests still pass
+- [x] All 10 fixes implemented
+- [x] `mypy --strict` passes trên affected files
+- [x] `ruff check` clean
+- [x] Existing tests still pass

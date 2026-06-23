@@ -18,7 +18,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from langchain_core.tools import tool
+from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -36,10 +36,10 @@ def _safe_path(file_path: str) -> Path:
     # Allow absolute paths within workspace
     try:
         p.relative_to(_WORKSPACE)
-    except ValueError:
+    except ValueError as exc:
         raise ValueError(
             f"Path '{file_path}' is outside workspace: {_WORKSPACE}"
-        )
+        ) from exc
     return p
 
 
@@ -335,7 +335,7 @@ def execute_command(command: str, timeout: int = 120) -> str:
 # Tool list for wiring into agents
 # ---------------------------------------------------------------------------
 
-BASIC_TOOLS: list = [
+BASIC_TOOLS: list[BaseTool] = [
     read_file,
     write_file,
     edit_file,

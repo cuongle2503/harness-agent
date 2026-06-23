@@ -292,14 +292,14 @@ class SubAgentLoader:
             try:
                 tool = self.tool_registry.get(name)
                 tools.append(tool)
-            except Exception:
+            except Exception as exc:
                 available = [
                     t["name"] for t in self.tool_registry.list_tools()
                 ]
                 raise SubAgentLoadError(
                     f"Tool '{name}' in {source_file} not found in registry. "
                     f"Available tools: {available}"
-                )
+                ) from exc
         return tools
 
     def list_subagents(self) -> list[SubAgentInfo]:

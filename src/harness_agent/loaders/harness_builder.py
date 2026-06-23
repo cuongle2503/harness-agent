@@ -12,6 +12,7 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 
 from harness_agent.config import AgentModelSelection
+from harness_agent.core.exceptions import HarnessError
 from harness_agent.loaders.config_loader import ConfigLoader, HarnessConfig
 from harness_agent.loaders.hook_loader import EventBus, HookLoader
 from harness_agent.loaders.rule_loader import RuleLoader
@@ -293,7 +294,8 @@ class HarnessBuilder:
 
     def _build_backend(self) -> CompositeBackend:
         """Build a CompositeBackend from config."""
-        assert self.config is not None
+        if self.config is None:
+            raise HarnessError("HarnessBuilder.config is None — call load() first")
         cfg = self.config.backend
         routes: dict[str, Any] = {}
 
@@ -371,7 +373,8 @@ class HarnessBuilder:
         Maps middleware names to instances. Uses ``middleware_order``
         from config if specified, otherwise ``DEFAULT_MIDDLEWARE_ORDER``.
         """
-        assert self.config is not None
+        if self.config is None:
+            raise HarnessError("HarnessBuilder.config is None — call load() first")
         order = self.config.middleware_order or DEFAULT_MIDDLEWARE_ORDER
 
         # Middleware name → factory function.
@@ -446,7 +449,8 @@ class HarnessBuilder:
         Dynamically includes available skills from
         ``.harness/skills/`` when no custom prompt is configured.
         """
-        assert self.config is not None
+        if self.config is None:
+            raise HarnessError("HarnessBuilder.config is None — call load() first")
 
         custom_prompt = self.config_loader.load_system_prompt(
             self.config, self.project_root
