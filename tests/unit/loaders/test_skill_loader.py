@@ -144,14 +144,19 @@ class TestSkillInfo:
         assert info.name == "deploy-to-k8s"
 
     def test_repr_format(self) -> None:
-        """SkillInfo.__repr__ shows name and size."""
-        info = SkillInfo(name="my-skill", path="/tmp/skills/my-skill.md", size=42)
-        assert repr(info) == "SkillInfo(name='my-skill', size=42)"
+        """SkillInfo.__repr__ shows name, size, and description."""
+        info = SkillInfo(
+            name="my-skill", path="/tmp/skills/my-skill.md", size=42,
+            description="A test skill",
+        )
+        assert "my-skill" in repr(info)
+        assert "42" in repr(info)
+        assert "A test skill" in repr(info)
 
     def test_equality(self) -> None:
         """Two SkillInfo with same fields are equal."""
-        a = SkillInfo(name="x", path="/p/x.md", size=10)
-        b = SkillInfo(name="x", path="/p/x.md", size=10)
+        a = SkillInfo(name="x", path="/p/x.md", size=10, description="d")
+        b = SkillInfo(name="x", path="/p/x.md", size=10, description="d")
         assert a == b
 
     def test_inequality(self) -> None:

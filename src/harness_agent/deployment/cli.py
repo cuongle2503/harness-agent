@@ -42,6 +42,7 @@ from harness_agent.loaders.hook_loader import (
     HookEvent,
     HookResult,
 )
+from harness_agent.loaders.skill_loader import SkillLoader
 from harness_agent.memory.hybrid_memory import HybridMemory
 from harness_agent.monitoring.metrics import AgentMetrics
 from harness_agent.prompts import load_prompt
@@ -936,6 +937,27 @@ class CLIAgent:
             "- **glob**, **grep** — Search files by pattern or content",
             "- **execute_command** — Run shell commands (tests, lint, git, etc.)",
         ]
+
+        # Skills section — progressive disclosure (name+desc always visible)
+        if self._harness_skill_sources:
+            # Use SkillLoader to extract name + description metadata
+            project_root = Path(self.config.project_root)
+            skill_loader = SkillLoader(project_root / ".harness")
+            skill_list = skill_loader.list_skills()
+            if skill_list:
+                parts.append("")
+                parts.append("## Available Skills")
+                parts.append(
+                    "These skills are **always available**. When a task "
+                    "matches a skill's description below, follow its "
+                    "instructions precisely. Skills provide step-by-step "
+                    "workflows for specific tasks."
+                )
+                parts.append("")
+                for sk in skill_list:
+                    name = sk.name or sk.path
+                    desc = sk.description or "No description available"
+                    parts.append(f"- **{name}**: {desc}")
 
         # Subagents section — only list what's actually configured
         if self._harness_subagent_defs:
