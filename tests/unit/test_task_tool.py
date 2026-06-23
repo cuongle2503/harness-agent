@@ -65,6 +65,14 @@ class TestTaskToolCreation:
         assert tool.name == "task"
         assert isinstance(tool, TaskTool)
 
+    def test_run_with_empty_defs_returns_helpful_message(
+        self, mock_llm: MagicMock
+    ) -> None:
+        tool = create_task_tool([], mock_llm)
+        result = tool._run(subagent_type="researcher", task="Find papers")
+        assert "No subagents are configured" in result
+        assert ".harness/subagents/" in result
+
 
 class TestTaskToolExecution:
     """Tests for task tool invocation."""

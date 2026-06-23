@@ -247,6 +247,17 @@ async def stream_turn_graph(
                         input=str(tool_input)[:200],
                     )
 
+                if tool_name == "use_skill" and ctx.bridge:
+                    skill_name = (
+                        tool_input.get("skill_name", "")
+                        if isinstance(tool_input, dict)
+                        else str(tool_input)[:60]
+                    )
+                    ctx.bridge.activity(
+                        "skill_used",
+                        name=skill_name or "skill",
+                    )
+
                 pre_result = ctx.emit_tool_start(tool_name, tool_input)
                 if not pre_result.allowed:
                     # NOTE: In graph mode, the tool has already been dispatched
@@ -533,6 +544,28 @@ async def stream_turn_agent(
                 print(f"\n  {Color.warn('🚫 ' + blocked_msg)}")
                 tool_msgs.append(ToolMessage(content=blocked_msg, tool_call_id=tool_id))
                 continue
+
+            if tool_name == "task" and ctx.bridge:
+                subagent_name = (
+                    tool_args.get("subagent_type", "")
+                    if isinstance(tool_args, dict)
+                    else ""
+                )
+                ctx.bridge.activity(
+                    "subagent_start",
+                    name=subagent_name or "subagent",
+                    input=str(tool_args)[:200],
+                )
+
+            if tool_name == "use_skill" and ctx.bridge:
+                skill_name = (
+                    tool_args.get("skill_name", "")
+                    if isinstance(tool_args, dict)
+                    else ""
+                )
+                ctx.bridge.activity(
+                    "skill_used", name=skill_name or "skill"
+                )
 
             box_w = draw_tool_box_top(tool_name, tool_args)
 

@@ -249,12 +249,23 @@ class CLIAgent:
                 system_prompt += "\n\n" + skill_summary
 
             tools: list[Any] = list(BASIC_TOOLS)
-            if self._harness_subagent_defs:
-                from harness_agent.tools.task_tool import create_task_tool
-                task_tool = create_task_tool(
-                    self._harness_subagent_defs, self._llm
+
+            # Always register task tool when .harness/ is present —
+            # even with empty subagent_defs the tool returns a clear
+            # "no subagents available" message instead of "Unknown tool".
+            from harness_agent.tools.task_tool import create_task_tool
+            task_tool = create_task_tool(
+                self._harness_subagent_defs, self._llm
+            )
+            tools.append(task_tool)
+
+            # Register skill tool when skills are available
+            if self._harness_skill_sources:
+                from harness_agent.tools.skill_tool import create_skill_tool
+                skill_tool = create_skill_tool(
+                    self._harness_builder.skill_loader
                 )
-                tools.append(task_tool)
+                tools.append(skill_tool)
 
             return HarnessAgent(
                 llm=self._llm,
@@ -275,7 +286,7 @@ class CLIAgent:
         # Tier 3: Basic agent (no .harness/)
         system_prompt = self.config.system_prompt
         if not system_prompt:
-            system_prompt = load_prompt("main_agent")
+            system_prompt = load_prompt("main_agent_basic")
 
         return HarnessAgent(
             llm=self._llm,
@@ -350,7 +361,7 @@ class CLIAgent:
             return ""
         parts = [
             "## Available Skills",
-            "When a task matches a skill's description, apply its workflow.",
+            "Use the **use_skill** tool with `skill_name` to activate a workflow.",
             "",
         ]
         for sk in skills:
@@ -390,7 +401,13 @@ class CLIAgent:
             "- **read_file**, **write_file**, **edit_file** — File operations",
             "- **glob**, **grep** — Search files by pattern or content",
             "- **execute_command** — Run shell commands (tests, lint, git, etc.)",
+            "- **task** — Delegate work to a specialized subagent",
         ]
+
+        if self._harness_skill_sources:
+            parts.append(
+                "- **use_skill** — Activate a skill workflow by name"
+            )
 
         if self._harness_rule_sources:
             parts.append("")
@@ -408,9 +425,8 @@ class CLIAgent:
             parts.append("")
             parts.append("## Available Subagents")
             parts.append(
-                "These subagents are **pre-configured** in "
-                "``.harness/subagents/``. You can delegate tasks "
-                "to them when appropriate."
+                "Use the **task** tool with `subagent_type` set to one of "
+                "these names and `task` describing what to do:"
             )
             parts.append("")
             for sub in self._harness_subagent_defs:

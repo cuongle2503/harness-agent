@@ -52,6 +52,12 @@ class TaskTool(BaseTool):
     model_config = {"arbitrary_types_allowed": True}
 
     def _run(self, subagent_type: str, task: str) -> str:
+        if not self.subagent_defs:
+            return (
+                "No subagents are configured. "
+                "Add subagent YAML files to .harness/subagents/ to enable delegation."
+            )
+
         subagent_def = self._find_subagent(subagent_type)
         if subagent_def is None:
             available = [d["name"] for d in self.subagent_defs]
@@ -74,6 +80,12 @@ class TaskTool(BaseTool):
             return f"Subagent error: {e}"
 
     async def _arun(self, subagent_type: str, task: str) -> str:
+        if not self.subagent_defs:
+            return (
+                "No subagents are configured. "
+                "Add subagent YAML files to .harness/subagents/ to enable delegation."
+            )
+
         subagent_def = self._find_subagent(subagent_type)
         if subagent_def is None:
             available = [d["name"] for d in self.subagent_defs]
