@@ -866,7 +866,9 @@ class CLIAgent:
         # ── Try HarnessBuilder.build() for full middleware support ──
         if self._harness_builder is not None:
             try:
-                self._graph = self._harness_builder.build()
+                # Pass the already-initialized LLM so build() doesn't
+                # need to create a new one (avoids API key issues).
+                self._graph = self._harness_builder.build(model=self._llm)
                 # Return a lightweight HarnessAgent wrapper for backward
                 # compatibility — _stream_turn detects self._graph and
                 # uses astream_events() instead of manual LLM loop.

@@ -185,8 +185,17 @@ class HarnessBuilder:
         """
         return self._build_system_prompt()
 
-    def build(self) -> Any:
+    def build(
+        self, *, model: Any = None, summarization_model: Any = None
+    ) -> Any:
         """Build the agent from ``.harness/`` configuration.
+
+        Args:
+            model: Optional pre-created BaseChatModel. When provided,
+                this model is used directly instead of creating a new
+                one via ``_resolve_model``. Pass the already-initialized
+                LLM from the caller to avoid API key issues.
+            summarization_model: Optional pre-created summarization model.
 
         Returns:
             A CompiledStateGraph ready for invoke/stream when
@@ -222,9 +231,9 @@ class HarnessBuilder:
         rule_sources = self.rule_loader.get_memory_sources()
         skill_sources = self.skill_loader.get_memory_sources()
 
-        # Step 6: Resolve models
-        main_model = self._resolve_model(self.config.model)
-        summarization_model = self._resolve_model(
+        # Step 6: Resolve models — use pre-created models if provided
+        main_model = model or self._resolve_model(self.config.model)
+        sum_model = summarization_model or self._resolve_model(
             self.config.summarization_model
         )
 
@@ -236,7 +245,7 @@ class HarnessBuilder:
             backend=backend,
             subagent_defs=subagent_defs,
             memory_sources=rule_sources + skill_sources,
-            summarization_model=summarization_model,
+            summarization_model=sum_model,
         )
 
         # Step 8: Build system prompt
