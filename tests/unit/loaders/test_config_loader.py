@@ -10,17 +10,16 @@ from pathlib import Path
 import pytest
 
 from harness_agent.loaders.config_loader import (
+    DEFAULT_MIDDLEWARE_ORDER,
     BackendConfig,
     BackendRouteConfig,
     ConfigLoader,
     ConfigParseError,
-    DEFAULT_MIDDLEWARE_ORDER,
     FeaturesConfig,
     HarnessConfig,
     MiddlewareParamConfig,
     SecurityConfig,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -403,7 +402,7 @@ class TestHarnessConfigDefaults:
 
     def test_valid_backends(self) -> None:
         """VALID_BACKENDS covers the three expected backend types."""
-        assert HarnessConfig.VALID_BACKENDS == {"state", "store", "filesystem"}
+        assert {"state", "store", "filesystem"} == HarnessConfig.VALID_BACKENDS
 
     def test_source_path_default_empty(self) -> None:
         """source_path is empty string by default."""

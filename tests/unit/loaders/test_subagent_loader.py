@@ -14,11 +14,10 @@ from langchain_core.tools import BaseTool
 from harness_agent.loaders.subagent_loader import (
     MiddlewareResolver,
     SubAgentInfo,
-    SubAgentLoadError,
     SubAgentLoader,
+    SubAgentLoadError,
 )
 from harness_agent.tools.registry import ToolRegistry
-
 
 # ── Mock tool for testing ─────────────────────────────────────────────────
 
@@ -309,7 +308,7 @@ class TestSubAgentLoaderLoadAll:
             "  tabs: \tbroken\n"
         )
         # This might parse but produce unexpected types
-        loader = SubAgentLoader(temp_harness_dir, tool_registry)
+        SubAgentLoader(temp_harness_dir, tool_registry)
         # The YAML here is actually valid but produces complex types
         # Let's create truly invalid YAML
         (sub_dir / "really-bad.yaml").write_text(

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import glob as glob_module
 import logging
-import os
 import re
 import shlex
 import subprocess
@@ -22,28 +21,20 @@ from pathlib import Path
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
+from harness_agent.tools.file_tools import _WORKSPACE_ROOT, _resolve_safe_path
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
 
-_WORKSPACE = Path(
-    os.environ.get("HARNESS_WORKSPACE_ROOT", str(Path.cwd()))
-).resolve()
+_WORKSPACE = _WORKSPACE_ROOT
 
 
 def _safe_path(file_path: str) -> Path:
     """Resolve and validate a file path against workspace traversal."""
-    p = Path(file_path).resolve()
-    # Allow absolute paths within workspace
-    try:
-        p.relative_to(_WORKSPACE)
-    except ValueError as exc:
-        raise ValueError(
-            f"Path '{file_path}' is outside workspace: {_WORKSPACE}"
-        ) from exc
-    return p
+    return _resolve_safe_path(file_path, _WORKSPACE)
 
 
 # ---------------------------------------------------------------------------

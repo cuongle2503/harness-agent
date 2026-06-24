@@ -10,11 +10,12 @@ import logging
 import os
 import subprocess
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from importlib import util as importlib_util
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ── Hook Event Types ────────────────────────────────────────────────────────
 
 
-class HookEvent(str, Enum):
+class HookEvent(str, Enum):  # noqa: UP042
     """Events in the agent lifecycle that hooks can listen to."""
 
     SESSION_START = "session_start"

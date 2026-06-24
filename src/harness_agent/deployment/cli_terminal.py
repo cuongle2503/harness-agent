@@ -440,7 +440,12 @@ _DEBUG_CHUNK_COUNT = 0
 
 
 def debug_chunk(chunk: Any, extracted: str) -> None:
-    """Log first 5 chunks to help diagnose streaming issues."""
+    """Log first 5 chunks to help diagnose streaming issues (debug mode only)."""
+    from harness_agent.monitoring.debug import is_debug_enabled
+
+    if not is_debug_enabled():
+        return
+
     global _DEBUG_CHUNK_COUNT
     if _DEBUG_CHUNK_COUNT >= 5:
         return

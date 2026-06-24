@@ -5,13 +5,11 @@ Plan: docs/guides/plans-phase-2/05-hook-loader.md §6.2 — HookLoader Testing P
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
 from harness_agent.loaders.hook_loader import EventBus, HookEvent, HookLoader
-
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 

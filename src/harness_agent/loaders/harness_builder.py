@@ -13,7 +13,11 @@ from langchain_core.language_models import BaseChatModel
 
 from harness_agent.config import AgentModelSelection
 from harness_agent.core.exceptions import HarnessError
-from harness_agent.loaders.config_loader import ConfigLoader, HarnessConfig
+from harness_agent.loaders.config_loader import (
+    DEFAULT_MIDDLEWARE_ORDER,
+    ConfigLoader,
+    HarnessConfig,
+)
 from harness_agent.loaders.hook_loader import EventBus, HookLoader
 from harness_agent.loaders.rule_loader import RuleLoader
 from harness_agent.loaders.skill_loader import SkillLoader
@@ -47,20 +51,6 @@ try:
 except ImportError:  # pragma: no cover
     _LANGCHAIN_MIDDLEWARE_AVAILABLE = False
 
-# Default middleware order (5-layer principle from 03-middleware.md)
-DEFAULT_MIDDLEWARE_ORDER = [
-    "TodoListMiddleware",        # Layer 1: Planning
-    "MemoryMiddleware",          # Layer 1: Context
-    "HumanInTheLoopMiddleware",  # Layer 2: Security
-    "PIIMiddleware",             # Layer 2: Security
-    "FilesystemMiddleware",      # Layer 3: Capabilities
-    "SubAgentMiddleware",        # Layer 4: Execution
-    "ShellToolMiddleware",       # Layer 4: Execution
-    "SummarizationMiddleware",   # Layer 5: Context Management
-    "ContextEditingMiddleware",  # Layer 5: Context Management
-    "ModelFallbackMiddleware",   # Layer 6: Resilience
-    "ToolRetryMiddleware",       # Layer 6: Resilience
-]
 
 
 class HarnessBuildError(Exception):

@@ -251,7 +251,7 @@ class ConfigLoader:
             return HarnessConfig(source_path=str(self.config_path))
 
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 raw = yaml.safe_load(f) or {}
         except yaml.YAMLError as e:
             raise ConfigParseError(

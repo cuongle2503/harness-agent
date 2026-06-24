@@ -59,13 +59,13 @@ class TestMutableClassDict:
             _MetricsHandler.harness_info["new_key"] = "value"  # type: ignore[index]
 
     def test_start_metrics_server_freezes_info(self) -> None:
+        import time
+
         from harness_agent.deployment.cli_metrics_server import (
             _MetricsHandler,
             start_metrics_server,
         )
         from harness_agent.monitoring.metrics import AgentMetrics
-
-        import time
 
         metrics = AgentMetrics()
         info = {"skills": ["a", "b"], "rules": ["r1"]}

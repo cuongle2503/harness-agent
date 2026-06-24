@@ -8,6 +8,7 @@ LLM-loop fallback.
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 import traceback as _traceback
@@ -58,6 +59,7 @@ class TurnContext:
     llm: Any
     harness_rule_sources: list[str] = field(default_factory=list)
     harness_skill_names: list[str] = field(default_factory=list)
+    _emitted_skills: set[str] = field(default_factory=set)
 
     def fire_hook(self, event: HookEvent, context: dict[str, Any]) -> HookResult:
         """Fire a hook event and emit activity for the Live Workflow UI."""
@@ -91,20 +93,33 @@ class TurnContext:
             },
         )
 
+    def emit_skill_used(self, skill_name: str) -> None:
+        """Emit skill_used activity, deduplicating within a turn."""
+        key = skill_name.lower()
+        if key in self._emitted_skills:
+            return
+        self._emitted_skills.add(key)
+        if self.bridge:
+            self.bridge.activity("skill_used", name=skill_name)
+
     def detect_skill_usage(self, user_input: str, response_text: str) -> None:
         """Detect which skills were activated and emit skill_used activities.
 
-        Matches user input and LLM response against known skill names.
-        Emits a skill_used activity for each matched skill so the UI
-        can visualize skill activation in real time.
+        Uses word-boundary regex matching against user input and LLM
+        response to avoid false positives from short skill names.
+        Skips skills already emitted earlier in the turn (e.g. via
+        use_skill tool call or on_custom_event).
         """
         if not self.bridge or not self.harness_skill_names:
             return
 
         combined = (user_input + " " + response_text).lower()
         for skill_name in self.harness_skill_names:
-            if skill_name in combined:
-                self.bridge.activity("skill_used", name=skill_name)
+            if skill_name.lower() in self._emitted_skills:
+                continue
+            pattern = r"\b" + re.escape(skill_name.lower()) + r"\b"
+            if re.search(pattern, combined):
+                self.emit_skill_used(skill_name)
 
     def emit_llm_end(self, elapsed_ms: int, *, success: bool = True) -> None:
         """Fire POST_LLM_CALL hook."""
@@ -253,10 +268,7 @@ async def stream_turn_graph(
                         if isinstance(tool_input, dict)
                         else str(tool_input)[:60]
                     )
-                    ctx.bridge.activity(
-                        "skill_used",
-                        name=skill_name or "skill",
-                    )
+                    ctx.emit_skill_used(skill_name or "skill")
 
                 pre_result = ctx.emit_tool_start(tool_name, tool_input)
                 if not pre_result.allowed:
@@ -302,6 +314,15 @@ async def stream_turn_graph(
                         )
 
                     output = event.get("data", {}).get("output")
+
+                    # Detect skill activation from SkillTool output header
+                    if tool_name == "use_skill" and output:
+                        out_str = str(output)
+                        if out_str.startswith("# Skill: "):
+                            header = out_str.split("\n", 1)[0]
+                            detected = header.removeprefix("# Skill: ").strip()
+                            if detected:
+                                ctx.emit_skill_used(detected)
                     result_str = str(output) if output else "(no output)"
                     error = "error" in str(kind).lower()
 
@@ -326,15 +347,17 @@ async def stream_turn_graph(
                 # SkillsMiddleware emits custom events on skill activation
                 custom_data = event.get("data", {})
                 event_name = event.get("name", "")
-                if "skill" in event_name.lower() and ctx.bridge:
+                event_lower = event_name.lower()
+                if ctx.bridge and any(
+                    kw in event_lower
+                    for kw in ("skill", "activate", "progressive", "disclosure")
+                ):
                     skill_name = (
                         custom_data.get("skill_name", "")
                         if isinstance(custom_data, dict)
                         else str(custom_data)[:60]
                     )
-                    ctx.bridge.activity(
-                        "skill_used", name=skill_name or event_name
-                    )
+                    ctx.emit_skill_used(skill_name or event_name)
 
     except Exception as e:
         ctx.emit_error(e, len(messages), tool_count)
@@ -563,9 +586,7 @@ async def stream_turn_agent(
                     if isinstance(tool_args, dict)
                     else ""
                 )
-                ctx.bridge.activity(
-                    "skill_used", name=skill_name or "skill"
-                )
+                ctx.emit_skill_used(skill_name or "skill")
 
             box_w = draw_tool_box_top(tool_name, tool_args)
 

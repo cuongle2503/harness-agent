@@ -7,10 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
 from harness_agent.loaders.hook_loader import EventBus, HookEvent, HookResult
-
 
 # ── Helper: simple listener factory ─────────────────────────────────────────
 

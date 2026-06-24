@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from langchain.agents.middleware import AgentMiddleware
-from langchain.agents.middleware.types import AgentState
 
 from harness_agent.monitoring.config import LoggingConfig
 from harness_agent.monitoring.metrics import AgentMetrics
@@ -284,34 +283,6 @@ class StructuredLoggingMiddleware(AgentMiddleware):
                 )
             )
             raise
-
-    # ------------------------------------------------------------------
-    # Agent lifecycle hooks
-    # ------------------------------------------------------------------
-
-    def before_agent(
-        self, _state: AgentState[Any], _runtime: Any
-    ) -> dict[str, Any] | None:
-        """Hook before agent execution. Records task start."""
-        return None
-
-    def after_agent(
-        self, _state: AgentState[Any], _runtime: Any
-    ) -> dict[str, Any] | None:
-        """Hook after agent execution. Records task completion."""
-        return None
-
-    async def abefore_agent(
-        self, _state: AgentState[Any], _runtime: Any
-    ) -> dict[str, Any] | None:
-        """Async hook before agent execution."""
-        return None
-
-    async def aafter_agent(
-        self, _state: AgentState[Any], _runtime: Any
-    ) -> dict[str, Any] | None:
-        """Async hook after agent execution."""
-        return None
 
     # ------------------------------------------------------------------
     # Public event recording (called by orchestrator / external code)

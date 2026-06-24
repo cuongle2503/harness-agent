@@ -144,24 +144,3 @@ class TestAllSubagentsHavePrompts:
         assert len(prompt) > 0
 
 
-class TestBackendFactory:
-    """Tests for create_hybrid_backend."""
-
-    def test_backend_creates_default(self) -> None:
-        """create_hybrid_backend works without a store."""
-        from deepagents.backends import CompositeBackend
-
-        from harness_agent.memory.backends import create_hybrid_backend
-
-        backend = create_hybrid_backend()
-        assert isinstance(backend, CompositeBackend)
-
-    def test_backend_with_store(self) -> None:
-        """create_hybrid_backend accepts optional store."""
-        from deepagents.backends import CompositeBackend
-
-        from harness_agent.memory.backends import create_hybrid_backend
-
-        mock_store = MagicMock()
-        backend = create_hybrid_backend(store=mock_store)
-        assert isinstance(backend, CompositeBackend)

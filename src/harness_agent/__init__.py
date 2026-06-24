@@ -8,7 +8,6 @@ from harness_agent.core.exceptions import (
     ToolExecutionError,
     ToolNotFoundError,
 )
-from harness_agent.core.orchestrator import AgentOrchestrator
 from harness_agent.deployment import (
     AgentRequest,
     AgentResponse,
@@ -22,6 +21,17 @@ from harness_agent.evaluation import (
     AgentABTester,
     AgentEvaluator,
     EvaluationResult,
+)
+from harness_agent.loaders import (
+    DEFAULT_MIDDLEWARE_ORDER,
+    BackendConfig,
+    BackendRouteConfig,
+    ConfigLoader,
+    ConfigParseError,
+    FeaturesConfig,
+    HarnessConfig,
+    MiddlewareParamConfig,
+    SecurityConfig,
 )
 from harness_agent.memory.hybrid_memory import HybridMemory, MemoryItem
 from harness_agent.monitoring import (
@@ -50,18 +60,6 @@ from harness_agent.security import (
 )
 from harness_agent.tools.registry import ToolRegistry
 
-from harness_agent.loaders import (
-    BackendConfig,
-    BackendRouteConfig,
-    ConfigLoader,
-    ConfigParseError,
-    DEFAULT_MIDDLEWARE_ORDER,
-    FeaturesConfig,
-    HarnessConfig,
-    MiddlewareParamConfig,
-    SecurityConfig,
-)
-
 __version__ = "0.2.0"
 
 __all__ = [
@@ -70,7 +68,6 @@ __all__ = [
     "AgentEvaluator",
     "AgentExecutionError",
     "AgentMetrics",
-    "AgentOrchestrator",
     "AgentRequest",
     "AgentResponse",
     "AlertConfig",

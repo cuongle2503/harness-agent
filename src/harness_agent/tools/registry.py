@@ -89,22 +89,5 @@ class ToolRegistry:
         except Exception as exc:
             raise ToolExecutionError(name, exc) from exc
 
-    @classmethod
-    def from_inventory(cls, inventory: Any) -> ToolRegistry:
-        """Create a registry from a ToolInventory instance.
-
-        Not yet implemented. Will integrate with ToolInventory in a future phase.
-
-        Args:
-            inventory: A ToolInventory instance.
-
-        Raises:
-            NotImplementedError: Always — integration deferred to a future phase.
-        """
-        raise NotImplementedError(
-            "ToolRegistry.from_inventory() is not yet implemented. "
-            "Use ToolRegistry() and register tools individually."
-        )
-
     def __len__(self) -> int:
         return len(self._tools)

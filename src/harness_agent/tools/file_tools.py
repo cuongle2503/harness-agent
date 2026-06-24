@@ -18,7 +18,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import socket
 from pathlib import Path
 from urllib.parse import urlparse
@@ -147,34 +146,6 @@ def _all_addrs_are_public(hostname: str) -> bool:
     return len(addrs) > 0
 
 
-class FileWriteInput(BaseModel):
-    """Input schema for custom file write operations with path safety."""
-
-    file_path: str = Field(..., max_length=1024)
-    content: str = Field(..., max_length=100_000)
-
-    @field_validator("file_path")
-    @classmethod
-    def no_path_traversal(cls, v: str) -> str:
-        """Prevent path traversal outside the workspace."""
-        safe = _resolve_safe_path(v)
-        return str(safe)
-
-
-
-class SearchInput(BaseModel):
-    """Input schema for search operations with sanitization."""
-
-    query: str = Field(..., max_length=500)
-    max_results: int = Field(default=10, ge=1, le=50)
-
-    @field_validator("query")
-    @classmethod
-    def sanitize_query(cls, v: str) -> str:
-        """Sanitize search query by stripping HTML/script tags."""
-        v = re.sub(r"<[^>]*>", "", v)
-        v = v.replace("\x00", "")
-        return v[:500]
 
 
 @tool(args_schema=FetchUrlInput)

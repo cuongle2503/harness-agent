@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -318,33 +317,3 @@ class TestToolNameExtraction:
     def test_tool_name_fallback_unknown(self) -> None:
         mw = StructuredLoggingMiddleware()
         assert mw._extract_tool_name("not_a_request") == "unknown"
-
-
-# ── Lifecycle hooks ──────────────────────────────────────────────────────────
-
-
-class TestLifecycleHooks:
-    """Tests for before_agent / after_agent hooks."""
-
-    def test_before_agent_returns_none(self) -> None:
-        mw = StructuredLoggingMiddleware()
-        # AgentState needs at least 'messages' key
-        state: dict[str, Any] = {"messages": []}
-        assert mw.before_agent(state, None) is None  # type: ignore[arg-type]
-
-    def test_after_agent_returns_none(self) -> None:
-        mw = StructuredLoggingMiddleware()
-        state: dict[str, Any] = {"messages": []}
-        assert mw.after_agent(state, None) is None  # type: ignore[arg-type]
-
-    @pytest.mark.asyncio
-    async def test_abefore_agent_returns_none(self) -> None:
-        mw = StructuredLoggingMiddleware()
-        state: dict[str, Any] = {"messages": []}
-        assert await mw.abefore_agent(state, None) is None  # type: ignore[arg-type]
-
-    @pytest.mark.asyncio
-    async def test_aafter_agent_returns_none(self) -> None:
-        mw = StructuredLoggingMiddleware()
-        state: dict[str, Any] = {"messages": []}
-        assert await mw.aafter_agent(state, None) is None  # type: ignore[arg-type]

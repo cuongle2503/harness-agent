@@ -11,11 +11,9 @@ from unittest import mock
 import pytest
 
 from harness_agent.loaders.harness_builder import (
-    DEFAULT_MIDDLEWARE_ORDER,
-    HarnessBuildError,
     HarnessBuilder,
+    HarnessBuildError,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -398,7 +396,7 @@ class TestHarnessBuilderErrors:
         )
 
         builder = HarnessBuilder(project)
-        with pytest.raises(Exception):
+        with pytest.raises((HarnessBuildError, Exception)):
             builder.build()
 
 
@@ -491,7 +489,7 @@ class TestHarnessBuilderLoadConfig:
             "model: deepseek-v4-flash\n\tbad: tab indent\n"
         )
         builder = HarnessBuilder(project)
-        with pytest.raises(Exception):
+        with pytest.raises((HarnessBuildError, Exception)):
             builder.load_config()
 
 

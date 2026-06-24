@@ -1,4 +1,4 @@
-"""Core agent components — HarnessAgent, AgentOrchestrator, exceptions."""
+"""Core agent components — HarnessAgent, exceptions."""
 
 from harness_agent.core.agent import HarnessAgent
 from harness_agent.core.exceptions import (
@@ -8,11 +8,9 @@ from harness_agent.core.exceptions import (
     ToolExecutionError,
     ToolNotFoundError,
 )
-from harness_agent.core.orchestrator import AgentOrchestrator
 
 __all__ = [
     "AgentExecutionError",
-    "AgentOrchestrator",
     "HarnessAgent",
     "HarnessError",
     "SubagentTimeoutError",
